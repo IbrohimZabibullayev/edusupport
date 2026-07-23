@@ -26,3 +26,15 @@ export async function ensureDefaultModules(): Promise<void> {
   });
   console.log(`✅ ${DEFAULT_MODULES.length} ta standart modul bazaga qo'shildi`);
 }
+
+const DEFAULT_SYSTEMS = ["Edu Tizim", "EduSchool"];
+
+/** Tizimlar jadvali bo'sh bo'lsa standart tizimlarni qo'shadi */
+export async function ensureDefaultSystems(): Promise<void> {
+  const count = await prisma.system.count();
+  if (count > 0) return;
+  await prisma.system.createMany({
+    data: DEFAULT_SYSTEMS.map((name, i) => ({ name, sortOrder: i + 1 })),
+  });
+  console.log(`✅ ${DEFAULT_SYSTEMS.length} ta tizim bazaga qo'shildi`);
+}

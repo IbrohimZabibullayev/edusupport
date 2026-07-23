@@ -16,6 +16,7 @@ requestsRouter.get("/", wrap(async (req, res) => {
   const where: Prisma.RequestWhereInput = {};
 
   if (typeof q.type === "string" && TYPES.has(q.type)) where.type = q.type as RequestType;
+  if (q.systemId && !isNaN(Number(q.systemId))) where.systemId = Number(q.systemId);
   if (q.moduleId && !isNaN(Number(q.moduleId))) where.moduleId = Number(q.moduleId);
   if (q.schoolId && !isNaN(Number(q.schoolId))) where.schoolId = Number(q.schoolId);
   if (q.operatorId && !isNaN(Number(q.operatorId))) where.operatorId = Number(q.operatorId);
@@ -52,6 +53,7 @@ requestsRouter.get("/", wrap(async (req, res) => {
         school: { select: { name: true } },
         operator: { select: { fullName: true } },
         module: { select: { name: true, emoji: true } },
+        system: { select: { name: true } },
         attachments: { select: { id: true, kind: true, caption: true } },
       },
       orderBy: { createdAt: "desc" },
@@ -68,6 +70,8 @@ requestsRouter.get("/", wrap(async (req, res) => {
       id: r.id,
       ticket: ticketId(r.ticketNumber),
       type: r.type,
+      systemId: r.systemId,
+      system: r.system?.name ?? null,
       moduleId: r.moduleId,
       module: r.module.name,
       moduleEmoji: r.module.emoji,

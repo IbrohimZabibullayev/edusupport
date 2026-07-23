@@ -30,6 +30,16 @@ model Module {
   requests  Request[]
 }
 
+model System {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  isActive    Boolean   @default(true)
+  sortOrder   Int       @default(0)
+  groupChatId String?
+  createdAt   DateTime  @default(now())
+  requests    Request[]
+}
+
 model Operator {
   id         Int            @id @default(autoincrement())
   telegramId String         @unique
@@ -56,6 +66,8 @@ model Request {
   id           Int         @id @default(autoincrement())
   ticketNumber Int         @unique @default(autoincrement())
   type         RequestType
+  systemId     Int?
+  system       System?     @relation(fields: [systemId], references: [id])
   moduleId     Int
   module       Module      @relation(fields: [moduleId], references: [id])
   schoolId     Int

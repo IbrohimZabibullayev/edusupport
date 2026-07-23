@@ -8,6 +8,16 @@ export interface ModuleCount {
   count: number;
 }
 
+export interface SystemItem {
+  id: number;
+  name: string;
+  isActive: boolean;
+  sortOrder: number;
+  groupConnected: boolean;
+  requestsCount: number;
+  createdAt: string;
+}
+
 export interface ModuleItem {
   id: number;
   name: string;
@@ -49,6 +59,8 @@ export interface RequestItem {
   id: number;
   ticket: string;
   type: RequestType;
+  systemId: number | null;
+  system: string | null;
   moduleId: number;
   module: string;
   moduleEmoji: string;

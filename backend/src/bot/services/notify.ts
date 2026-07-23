@@ -64,6 +64,7 @@ function requestCard(request: {
   type: RequestType;
   description: string;
   createdAt: Date;
+  system: { name: string } | null;
   module: { name: string; emoji: string };
   school: { name: string };
   operator: { fullName: string; username: string | null };
@@ -74,6 +75,7 @@ function requestCard(request: {
     : escapeHtml(op.fullName);
   return [
     `${TYPE_LABELS[request.type]} — <code>${ticketId(request.ticketNumber)}</code>`,
+    ...(request.system ? [`🖥 Tizim: ${escapeHtml(request.system.name)}`] : []),
     `🧩 Modul: ${escapeHtml(moduleLabel(request.module))}`,
     `🏫 Maktab: ${escapeHtml(request.school.name)}`,
     `👤 Operator: ${operatorLine}`,
@@ -87,19 +89,25 @@ function requestCard(request: {
 export async function routeRequest(api: Api, requestId: number, mediaRefs: MediaRef[] = []): Promise<void> {
   const request = await prisma.request.findUnique({
     where: { id: requestId },
-    include: { school: true, operator: true, module: true },
+    include: { school: true, operator: true, module: true, system: true },
   });
   if (!request) return;
 
   const text = requestCard(request);
 
   try {
-    // Hamma tur dev guruhga boradi; taklif uchun alohida backlog chat belgilangan bo'lsa — o'sha yerga
-    const devGroupId = await getDevGroupId();
+    // Avval tizimning o'z guruhi; taklif uchun backlog chat belgilangan bo'lsa — o'sha yerga;
+    // tizim guruhi bo'lmasa umumiy guruh; u ham bo'lmasa adminlarga
     const backlogChatId = await getBacklogChatId();
 
-    let target = devGroupId;
-    if (request.type === "SUGGESTION" && backlogChatId) target = backlogChatId;
+    let target: string | null = null;
+    if (request.type === "SUGGESTION" && backlogChatId) {
+      target = backlogChatId;
+    } else if (request.system?.groupChatId) {
+      target = request.system.groupChatId;
+    } else {
+      target = (await getDevGroupId()) || null;
+    }
 
     if (target) {
       await sendCardWithMedia(api, target, text, mediaRefs);

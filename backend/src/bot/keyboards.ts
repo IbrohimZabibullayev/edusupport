@@ -11,12 +11,20 @@ export const contactKeyboard = new Keyboard()
 
 /* Wizard tugmalari — klaviatura o'rnida chiqadigan katta (reply) tugmalar */
 
+/** Tizim tugmalari bazadagi faol tizimlardan dinamik quriladi */
+export function buildSystemKeyboard(systems: { name: string }[]): Keyboard {
+  const kb = new Keyboard();
+  for (const s of systems) kb.text(s.name).row();
+  return kb.text(BTN_CANCEL).resized();
+}
+
 export const typeKeyboard = new Keyboard()
   .text(TYPE_LABELS.BUG)
   .text(TYPE_LABELS.ISSUE)
   .row()
   .text(TYPE_LABELS.SUGGESTION)
   .row()
+  .text(BTN_BACK)
   .text(BTN_CANCEL)
   .resized();
 

@@ -1,4 +1,4 @@
-import { Bot, session } from "grammy";
+import { Bot, InlineKeyboard, session } from "grammy";
 import { config } from "../config";
 import { prisma } from "../db";
 import { SETTING_BACKLOG_CHAT, SETTING_DEV_GROUP, setSetting } from "../settings";
@@ -15,6 +15,7 @@ import {
   handleDescStep,
   handleModuleStep,
   handleSchoolStep,
+  handleSystemStep,
   handleTypeStep,
   startWizard,
 } from "./handlers/request";
@@ -33,22 +34,78 @@ function createBot(): Bot<MyContext> {
   bot.command("chatid", (ctx) => ctx.reply(`Chat ID: <code>${ctx.chat.id}</code>`, { parse_mode: "HTML" }));
 
   // Guruhni bazaga saqlash — .env yoki kodni o'zgartirish shart emas
-  const bindChat = (settingKey: string, okText: string) => async (ctx: { from?: { id: number }; chat: { id: number; type: string }; reply: (t: string) => Promise<unknown> }) => {
+  const requireAdmin = async (telegramId: number) => {
+    const op = await prisma.operator.findUnique({ where: { telegramId: telegramId.toString() } });
+    return op?.isAdmin ? op : null;
+  };
+
+  // /setgroup — guruh qaysi tizimga tegishliligini tanlash uchun tugmalar chiqaradi
+  bot.command("setgroup", async (ctx) => {
     if (!ctx.from) return;
-    const op = await prisma.operator.findUnique({ where: { telegramId: ctx.from.id.toString() } });
-    if (!op?.isAdmin) {
+    if (!(await requireAdmin(ctx.from.id))) {
       await ctx.reply("Bu buyruq faqat adminlar uchun.");
       return;
     }
     if (ctx.chat.type === "private") {
-      await ctx.reply("Bu buyruqni kerakli guruhning ichida yozing — o'sha guruh avtomatik saqlanadi.");
+      await ctx.reply("Bu buyruqni kerakli guruhning ichida yozing.");
       return;
     }
-    await setSetting(settingKey, String(ctx.chat.id));
-    await ctx.reply(okText);
-  };
-  bot.command("setgroup", bindChat(SETTING_DEV_GROUP, "✅ Guruh saqlandi! Endi mijozlardan kelgan muammo va fikr-mulohazalar shu guruhga yuborib boriladi."));
-  bot.command("setbacklog", bindChat(SETTING_BACKLOG_CHAT, "✅ Guruh saqlandi! Endi mijozlarning takliflari shu guruhga yuborib boriladi."));
+    const systems = await prisma.system.findMany({
+      where: { isActive: true },
+      orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+    });
+    const kb = new InlineKeyboard();
+    for (const s of systems) kb.text(s.name, `bindgroup:${s.id}`).row();
+    kb.text("📥 Umumiy (hamma tizim uchun)", "bindgroup:global");
+    await ctx.reply("Bu guruh qaysi tizimning so'rovlarini qabul qiladi?", { reply_markup: kb });
+  });
+
+  bot.callbackQuery(/^bindgroup:(\d+|global)$/, async (ctx) => {
+    if (!ctx.from || !ctx.chat) return;
+    if (!(await requireAdmin(ctx.from.id))) {
+      await ctx.answerCallbackQuery({ text: "Faqat adminlar uchun", show_alert: true });
+      return;
+    }
+    const target = ctx.match[1];
+    const chatId = String(ctx.chat.id);
+    let label: string;
+    if (target === "global") {
+      await setSetting(SETTING_DEV_GROUP, chatId);
+      label = "Umumiy (hamma tizim)";
+    } else {
+      const system = await prisma.system
+        .update({ where: { id: Number(target) }, data: { groupChatId: chatId } })
+        .catch(() => null);
+      if (!system) {
+        await ctx.answerCallbackQuery({ text: "Tizim topilmadi", show_alert: true });
+        return;
+      }
+      label = system.name;
+    }
+    await ctx.answerCallbackQuery();
+    try {
+      await ctx.editMessageText(
+        `✅ Guruh saqlandi! "${label}" bo'yicha mijozlardan kelgan muammo va fikr-mulohazalar endi shu guruhga yuborib boriladi.`
+      );
+    } catch {
+      // xabar allaqachon o'zgartirilgan bo'lishi mumkin
+    }
+  });
+
+  // /setbacklog — takliflar uchun umumiy chat
+  bot.command("setbacklog", async (ctx) => {
+    if (!ctx.from) return;
+    if (!(await requireAdmin(ctx.from.id))) {
+      await ctx.reply("Bu buyruq faqat adminlar uchun.");
+      return;
+    }
+    if (ctx.chat.type === "private") {
+      await ctx.reply("Bu buyruqni kerakli guruhning ichida yozing.");
+      return;
+    }
+    await setSetting(SETTING_BACKLOG_CHAT, String(ctx.chat.id));
+    await ctx.reply("✅ Guruh saqlandi! Endi mijozlarning takliflari shu guruhga yuborib boriladi.");
+  });
 
   // Qolgan hamma narsa faqat shaxsiy chatda
   bot.use(async (ctx, next) => {
@@ -105,6 +162,8 @@ function createBot(): Bot<MyContext> {
         return handleAdminLogin(ctx, text);
       case "admin_pass":
         return handleAdminPassword(ctx, text);
+      case "req_system":
+        return handleSystemStep(ctx, text);
       case "req_type":
         return handleTypeStep(ctx, text);
       case "req_module":

@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { to: "/operators", label: "Operatorlar", icon: "M12 12a4 4 0 100-8 4 4 0 000 8zm-8 8a8 8 0 0116 0z" },
   { to: "/schools", label: "Maktablar", icon: "M12 3l9 5-9 5-9-5zM5 12v5l7 4 7-4v-5" },
   { to: "/modules", label: "Modullar", icon: "M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" },
+  { to: "/systems", label: "Tizimlar", icon: "M3 5h18v11H3zM8 20h8M12 16v4" },
 ] as const;
 
 function NavIcon({ d }: { d: string }) {

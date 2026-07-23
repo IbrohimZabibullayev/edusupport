@@ -5,6 +5,7 @@ export type Step =
   | "idle"
   | "reg_name"
   | "reg_phone"
+  | "req_system"
   | "req_type"
   | "req_module"
   | "req_school"
@@ -21,6 +22,7 @@ export interface DraftAttachment {
 }
 
 export interface RequestDraft {
+  systemId?: number;
   type?: RequestType;
   moduleId?: number;
   schoolId?: number;

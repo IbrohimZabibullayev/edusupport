@@ -2,10 +2,11 @@ import { config } from "./config";
 import { createServer } from "./api/server";
 import { bot } from "./bot/bot";
 import { startWeeklyReportJob } from "./jobs/weeklyReport";
-import { ensureDefaultModules } from "./seed";
+import { ensureDefaultModules, ensureDefaultSystems } from "./seed";
 
 async function main(): Promise<void> {
   await ensureDefaultModules();
+  await ensureDefaultSystems();
 
   const app = createServer();
   app.listen(config.port, () => {

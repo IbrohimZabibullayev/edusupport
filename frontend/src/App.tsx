@@ -8,6 +8,7 @@ import Modules from "./pages/Modules";
 import Operators from "./pages/Operators";
 import Requests from "./pages/Requests";
 import Schools from "./pages/Schools";
+import Systems from "./pages/Systems";
 
 function RequireAuth({ children }: { children: ReactElement }) {
   if (!getToken()) return <Navigate to="/login" replace />;
@@ -30,6 +31,7 @@ export default function App() {
         <Route path="/operators" element={<Operators />} />
         <Route path="/schools" element={<Schools />} />
         <Route path="/modules" element={<Modules />} />
+        <Route path="/systems" element={<Systems />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

@@ -3,21 +3,24 @@ import { escapeHtml, ticketId } from "../../util";
 import {
   backCancelKeyboard,
   buildModuleKeyboard,
+  buildSystemKeyboard,
   mainMenu,
   submitKeyboard,
   typeKeyboard,
 } from "../keyboards";
 import { getActiveModules, moduleLabel } from "../services/modules";
+import { getActiveSystems } from "../services/systems";
 import { notifyAdmins, routeRequest } from "../services/notify";
 import { BTN_BACK, BTN_CANCEL, BTN_SUBMIT, LABEL_TO_TYPE, TYPE_LABELS } from "../texts";
 import { MyContext } from "../types";
 import { requireApprovedOperator } from "./registration";
 
-const ASK_TYPE = "1/4 · So'rov turini tanlang:";
-const ASK_MODULE = "2/4 · Qaysi modulga tegishli?";
-const ASK_SCHOOL = "3/4 · Maktab/muassasa nomini yozing:";
+const ASK_SYSTEM = "Qaysi tizim bo'yicha so'rov? Tanlang:";
+const ASK_TYPE = "So'rov turini tanlang:";
+const ASK_MODULE = "Qaysi modulga tegishli?";
+const ASK_SCHOOL = "Maktab/muassasa nomini yozing:";
 const ASK_DESC = [
-  "4/4 · Endi izoh yuboring.",
+  "Endi izoh yuboring.",
   "",
   "Matn, rasm, video, fayl yoki ovozli xabar — bir nechta xabar yuborishingiz mumkin.",
   `Hammasini yuborib bo'lgach, pastdagi "${BTN_SUBMIT}" tugmasini bosing.`,
@@ -27,6 +30,27 @@ export async function startWizard(ctx: MyContext): Promise<void> {
   const op = await requireApprovedOperator(ctx);
   if (!op) return;
   ctx.session.draft = {};
+  const systems = await getActiveSystems();
+  if (systems.length > 0) {
+    ctx.session.step = "req_system";
+    await ctx.reply(ASK_SYSTEM, { reply_markup: buildSystemKeyboard(systems) });
+  } else {
+    ctx.session.step = "req_type";
+    await ctx.reply(ASK_TYPE, { reply_markup: typeKeyboard });
+  }
+}
+
+export async function handleSystemStep(ctx: MyContext, text: string): Promise<void> {
+  if (text === BTN_CANCEL) return cancelWizard(ctx);
+  const systems = await getActiveSystems();
+  const chosen = systems.find((s) => s.name === text);
+  if (!chosen) {
+    await ctx.reply("Iltimos, pastdagi tugmalardan birini tanlang.", {
+      reply_markup: buildSystemKeyboard(systems),
+    });
+    return;
+  }
+  ctx.session.draft = { ...ctx.session.draft, systemId: chosen.id };
   ctx.session.step = "req_type";
   await ctx.reply(ASK_TYPE, { reply_markup: typeKeyboard });
 }
@@ -39,6 +63,7 @@ async function cancelWizard(ctx: MyContext): Promise<void> {
 
 export async function handleTypeStep(ctx: MyContext, text: string): Promise<void> {
   if (text === BTN_CANCEL) return cancelWizard(ctx);
+  if (text === BTN_BACK) return startWizard(ctx);
   const type = LABEL_TO_TYPE[text];
   if (!type) {
     await ctx.reply("Iltimos, pastdagi tugmalardan birini tanlang.", { reply_markup: typeKeyboard });
@@ -188,6 +213,7 @@ async function submitRequest(ctx: MyContext): Promise<void> {
   const request = await prisma.request.create({
     data: {
       type: draft.type,
+      systemId: draft.systemId ?? null,
       moduleId: draft.moduleId,
       schoolId: draft.schoolId,
       operatorId: op.id,
