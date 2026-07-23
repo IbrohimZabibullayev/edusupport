@@ -1,0 +1,95 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum OperatorStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  BLOCKED
+}
+
+enum RequestType {
+  BUG
+  ISSUE
+  SUGGESTION
+}
+
+model Module {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  emoji     String    @default("")
+  isActive  Boolean   @default(true)
+  sortOrder Int       @default(0)
+  createdAt DateTime  @default(now())
+  requests  Request[]
+}
+
+model Operator {
+  id         Int            @id @default(autoincrement())
+  telegramId String         @unique
+  fullName   String
+  phone      String?
+  username   String?
+  status     OperatorStatus @default(PENDING)
+  isAdmin    Boolean        @default(false)
+  createdAt  DateTime       @default(now())
+  requests   Request[]
+  schools    School[]       @relation("SchoolCreator")
+}
+
+model School {
+  id                  Int       @id @default(autoincrement())
+  name                String    @unique
+  createdByOperatorId Int?
+  createdBy           Operator? @relation("SchoolCreator", fields: [createdByOperatorId], references: [id])
+  createdAt           DateTime  @default(now())
+  requests            Request[]
+}
+
+model Request {
+  id           Int         @id @default(autoincrement())
+  ticketNumber Int         @unique @default(autoincrement())
+  type         RequestType
+  moduleId     Int
+  module       Module      @relation(fields: [moduleId], references: [id])
+  schoolId     Int
+  school       School      @relation(fields: [schoolId], references: [id])
+  operatorId   Int
+  operator     Operator    @relation(fields: [operatorId], references: [id])
+  description  String
+  createdAt    DateTime    @default(now())
+  attachments  RequestAttachment[]
+
+  @@index([createdAt])
+  @@index([type])
+  @@index([moduleId])
+}
+
+model RequestAttachment {
+  id        Int      @id @default(autoincrement())
+  requestId Int
+  request   Request  @relation(fields: [requestId], references: [id])
+  kind      String
+  fileId    String
+  caption   String?
+  createdAt DateTime @default(now())
+
+  @@index([requestId])
+}
+
+model BotSession {
+  key   String @id
+  value String
+}
+
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
