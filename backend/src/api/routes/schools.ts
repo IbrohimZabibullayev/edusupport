@@ -6,7 +6,7 @@ export const schoolsRouter = Router();
 
 schoolsRouter.get("/", wrap(async (_req, res) => {
   const schools = await prisma.school.findMany({
-    include: { _count: { select: { requests: true } } },
+    include: { _count: { select: { requests: true, supportLogs: true } } },
     orderBy: { name: "asc" },
   });
   res.json(
@@ -14,6 +14,7 @@ schoolsRouter.get("/", wrap(async (_req, res) => {
       id: s.id,
       name: s.name,
       requestsCount: s._count.requests,
+      logsCount: s._count.supportLogs,
       createdAt: s.createdAt,
     }))
   );
@@ -56,4 +57,26 @@ schoolsRouter.patch("/:id", wrap(async (req, res) => {
   } catch {
     res.status(404).json({ error: "Maktab topilmadi" });
   }
+}));
+
+schoolsRouter.delete("/:id", wrap(async (req, res) => {
+  const id = Number(req.params.id);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Noto'g'ri so'rov" });
+    return;
+  }
+  const school = await prisma.school.findUnique({ where: { id } });
+  if (!school) {
+    res.status(404).json({ error: "Maktab topilmadi" });
+    return;
+  }
+  // Maktabga bog'liq so'rovlar (va ularning biriktirmalari) hamda support loglar ham o'chiriladi
+  const reqIds = (await prisma.request.findMany({ where: { schoolId: id }, select: { id: true } })).map((r) => r.id);
+  await prisma.$transaction([
+    prisma.requestAttachment.deleteMany({ where: { requestId: { in: reqIds } } }),
+    prisma.request.deleteMany({ where: { schoolId: id } }),
+    prisma.supportLog.deleteMany({ where: { schoolId: id } }),
+    prisma.school.delete({ where: { id } }),
+  ]);
+  res.json({ ok: true, deletedRequests: reqIds.length });
 }));

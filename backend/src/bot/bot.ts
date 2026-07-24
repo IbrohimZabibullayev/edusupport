@@ -2,6 +2,7 @@ import { Bot, InlineKeyboard, session } from "grammy";
 import { config } from "../config";
 import { prisma } from "../db";
 import { SETTING_BACKLOG_CHAT, SETTING_DEV_GROUP, setSetting } from "../settings";
+import { ticketId } from "../util";
 import { cmdAdmin, cmdReport, handleAdminLogin, handleAdminPassword } from "./handlers/admin";
 import {
   getOperator,
@@ -19,10 +20,20 @@ import {
   handleTypeStep,
   startWizard,
 } from "./handlers/request";
+import {
+  handleLogModule,
+  handleLogPriority,
+  handleLogProblem,
+  handleLogRecurring,
+  handleLogSchool,
+  handleLogSystem,
+  handleLogTime,
+  startLogWizard,
+} from "./handlers/supportLog";
 import { getActiveRequestTypes, requestTypeLabel } from "./services/requestTypes";
 import { learnTopic } from "./services/topics";
 import { PrismaStorage } from "./storage";
-import { BTN_NEW_REQUEST } from "./texts";
+import { BTN_NEW_REQUEST, BTN_SUPPORT_LOG } from "./texts";
 import { MyContext, SessionData } from "./types";
 
 /** Forum guruhda xabar qaysi bo'limda (topic) yozilgan bo'lsa, o'sha bo'lim raqami */
@@ -213,6 +224,41 @@ function createBot(): Bot<MyContext> {
     });
   });
 
+  // Guruhda so'rov kartasiga reply qilib /bajarildi (yoki /done) yozilsa — statusni o'zgartiramiz
+  bot.command(["bajarildi", "done"], async (ctx) => {
+    const threadId = threadOf(ctx.message);
+    if (ctx.chat.type === "private") {
+      await ctx.reply("Bu buyruqni guruhda so'rov xabariga reply qilib yozing.");
+      return;
+    }
+    const replied = ctx.message?.reply_to_message;
+    if (!replied) {
+      await ctx.reply("So'rov kartasiga (xabariga) reply qilib /bajarildi yozing.", { message_thread_id: threadId });
+      return;
+    }
+    const chatId = String(ctx.chat.id);
+    let req = await prisma.request.findFirst({ where: { cardChatId: chatId, cardMessageId: replied.message_id } });
+    if (!req) {
+      // Karta topilmasa — reply qilingan xabardan ticket raqamini topishga urinamiz
+      const src = ("text" in replied && replied.text) || ("caption" in replied && replied.caption) || "";
+      const m = src.match(/ES-?(\d+)/i);
+      if (m) req = await prisma.request.findUnique({ where: { ticketNumber: Number(m[1]) } });
+    }
+    if (!req) {
+      await ctx.reply("Bu xabarga bog'langan so'rov topilmadi. So'rov kartasiga reply qiling.", { message_thread_id: threadId });
+      return;
+    }
+    if (req.done) {
+      await ctx.reply(`ℹ️ ${ticketId(req.ticketNumber)} allaqachon bajarilgan.`, { message_thread_id: threadId });
+      return;
+    }
+    await prisma.request.update({ where: { id: req.id }, data: { done: true, doneAt: new Date() } });
+    const who = ctx.from ? [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(" ") : "";
+    await ctx.reply(`✅ ${ticketId(req.ticketNumber)} — bajarildi deb belgilandi${who ? ` (${who})` : ""}.`, {
+      message_thread_id: threadId,
+    });
+  });
+
   // Qolgan hamma narsa faqat shaxsiy chatda
   bot.use(async (ctx, next) => {
     if (ctx.chat && ctx.chat.type !== "private") return;
@@ -229,6 +275,7 @@ function createBot(): Bot<MyContext> {
   // Buyruqlar
   bot.command("start", handleStart);
   bot.command("new", startWizard);
+  bot.command("log", startLogWizard);
   bot.command("admin", cmdAdmin);
   bot.command("report", cmdReport);
 
@@ -278,13 +325,28 @@ function createBot(): Bot<MyContext> {
         return handleSchoolStep(ctx, text);
       case "req_desc":
         return handleDescStep(ctx, text);
+      case "log_system":
+        return handleLogSystem(ctx, text);
+      case "log_school":
+        return handleLogSchool(ctx, text);
+      case "log_module":
+        return handleLogModule(ctx, text);
+      case "log_problem":
+        return handleLogProblem(ctx, text);
+      case "log_priority":
+        return handleLogPriority(ctx, text);
+      case "log_time":
+        return handleLogTime(ctx, text);
+      case "log_recurring":
+        return handleLogRecurring(ctx, text);
       default: {
         if (text === BTN_NEW_REQUEST) return startWizard(ctx);
+        if (text === BTN_SUPPORT_LOG) return startLogWizard(ctx);
         const op = await getOperator(ctx);
         if (!op) {
           await ctx.reply("Ro'yxatdan o'tish uchun /start buyrug'ini yuboring.");
         } else if (op.status === "APPROVED") {
-          await ctx.reply(`So'rov kiritish uchun "${BTN_NEW_REQUEST}" tugmasini bosing yoki /new yozing.`);
+          await ctx.reply(`So'rov kiritish uchun "${BTN_NEW_REQUEST}", o'zingiz hal qilgan muammoni yozish uchun "${BTN_SUPPORT_LOG}" tugmasini bosing.`);
         } else if (op.status === "PENDING") {
           await ctx.reply("⏳ So'rovingiz hali tasdiqlanmagan. Iltimos, kuting.");
         } else {

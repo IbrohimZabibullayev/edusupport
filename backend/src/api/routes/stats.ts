@@ -110,6 +110,33 @@ statsRouter.get("/weekly", wrap(async (_req, res) => {
   res.json(weeks);
 }));
 
+// Modul kesimida: qanchasi guruhga so'rov qilingan, qanchasi support logga yozilgan
+statsRouter.get("/modules-combined", wrap(async (req, res) => {
+  const from = parseDate(req.query.from);
+  const to = parseDate(req.query.to);
+  const dateFilter = from || to ? { createdAt: { ...(from && { gte: from }), ...(to && { lte: to }) } } : {};
+
+  const [reqByModule, logByModule, modules] = await Promise.all([
+    prisma.request.groupBy({ by: ["moduleId"], where: dateFilter, _count: { _all: true } }),
+    prisma.supportLog.groupBy({ by: ["moduleId"], where: dateFilter, _count: { _all: true } }),
+    prisma.module.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }),
+  ]);
+  const reqMap = new Map(reqByModule.map((r) => [r.moduleId, r._count._all]));
+  const logMap = new Map(logByModule.map((r) => [r.moduleId, r._count._all]));
+
+  res.json(
+    modules
+      .filter((m) => m.isActive || reqMap.has(m.id) || logMap.has(m.id))
+      .map((m) => ({
+        id: m.id,
+        name: m.name,
+        requests: reqMap.get(m.id) ?? 0,
+        logs: logMap.get(m.id) ?? 0,
+      }))
+      .filter((m) => m.requests > 0 || m.logs > 0)
+  );
+}));
+
 statsRouter.get("/schools", wrap(async (req, res) => {
   const where = periodWhere(req);
   const grouped = await prisma.request.groupBy({

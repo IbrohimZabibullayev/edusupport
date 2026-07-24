@@ -34,16 +34,53 @@ model Module {
   sortOrder Int       @default(0)
   createdAt DateTime  @default(now())
   requests  Request[]
+  supportLogs SupportLog[]
 }
 
 model System {
-  id          Int       @id @default(autoincrement())
-  name        String    @unique
-  isActive    Boolean   @default(true)
-  sortOrder   Int       @default(0)
+  id          Int          @id @default(autoincrement())
+  name        String       @unique
+  isActive    Boolean      @default(true)
+  sortOrder   Int          @default(0)
   groupChatId String?
-  createdAt   DateTime  @default(now())
+  createdAt   DateTime     @default(now())
   requests    Request[]
+  supportLogs SupportLog[]
+}
+
+// Support log prioriteti (admin panelda boshqariladi): P1/P2/P3 kabi
+model Priority {
+  id          Int          @id @default(autoincrement())
+  key         String       @unique
+  name        String
+  color       String       @default("#eb6834")
+  isActive    Boolean      @default(true)
+  sortOrder   Int          @default(0)
+  createdAt   DateTime     @default(now())
+  supportLogs SupportLog[]
+}
+
+// Operator dasturchisiz o'zi hal qilgan muammolar jurnali (guruhga yuborilmaydi)
+model SupportLog {
+  id             Int       @id @default(autoincrement())
+  logNumber      Int       @unique @default(autoincrement())
+  systemId       Int?
+  system         System?   @relation(fields: [systemId], references: [id])
+  schoolId       Int
+  school         School    @relation(fields: [schoolId], references: [id])
+  moduleId       Int
+  module         Module    @relation(fields: [moduleId], references: [id])
+  problem        String
+  priorityId     Int?
+  priority       Priority? @relation(fields: [priorityId], references: [id])
+  resolveMinutes Int       @default(0)
+  recurring      Boolean   @default(false)
+  operatorId     Int
+  operator       Operator  @relation(fields: [operatorId], references: [id])
+  createdAt      DateTime  @default(now())
+
+  @@index([createdAt])
+  @@index([moduleId])
 }
 
 model Operator {
@@ -57,6 +94,7 @@ model Operator {
   createdAt  DateTime       @default(now())
   requests   Request[]
   schools    School[]       @relation("SchoolCreator")
+  supportLogs SupportLog[]
 }
 
 model School {
@@ -66,6 +104,7 @@ model School {
   createdBy           Operator? @relation("SchoolCreator", fields: [createdByOperatorId], references: [id])
   createdAt           DateTime  @default(now())
   requests            Request[]
+  supportLogs         SupportLog[]
 }
 
 model Request {
@@ -81,6 +120,10 @@ model Request {
   operatorId   Int
   operator     Operator    @relation(fields: [operatorId], references: [id])
   description  String
+  done         Boolean     @default(false)
+  doneAt       DateTime?
+  cardChatId   String?
+  cardMessageId Int?
   createdAt    DateTime    @default(now())
   attachments  RequestAttachment[]
 

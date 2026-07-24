@@ -1,4 +1,5 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import { IconClose } from "../components/icons";
 import { ErrorNote, LoadingNote, PageTitle } from "../components/ui";
 import { api } from "../lib/api";
 import { useActiveRequestTypes } from "../lib/requestTypes";
@@ -89,7 +90,7 @@ export default function TopicKeywords() {
                           title="O'chirish"
                           className="flex h-5 w-5 items-center justify-center rounded-full text-muted hover:bg-danger/10 hover:text-danger disabled:opacity-40"
                         >
-                          ×
+                          <IconClose className="h-3.5 w-3.5" />
                         </button>
                       </span>
                     ))

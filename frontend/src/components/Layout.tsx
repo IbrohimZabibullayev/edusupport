@@ -5,12 +5,10 @@ import { setToken } from "../lib/api";
 const NAV_ITEMS = [
   { to: "/", label: "Boshqaruv paneli", icon: "M3 13h4v8H3zM10 8h4v13h-4zM17 3h4v18h-4z" },
   { to: "/requests", label: "So'rovlar", icon: "M4 5h16v3H4zM4 10h16v3H4zM4 15h16v3H4z" },
+  { to: "/support-log", label: "Support log", icon: "M5 3h11l3 3v15H5zM9 8h6M9 12h6M9 16h4" },
   { to: "/operators", label: "Operatorlar", icon: "M12 12a4 4 0 100-8 4 4 0 000 8zm-8 8a8 8 0 0116 0z" },
   { to: "/schools", label: "Maktablar", icon: "M12 3l9 5-9 5-9-5zM5 12v5l7 4 7-4v-5" },
-  { to: "/modules", label: "Modullar", icon: "M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" },
-  { to: "/systems", label: "Tizimlar", icon: "M3 5h18v11H3zM8 20h8M12 16v4" },
-  { to: "/request-types", label: "So'rov turlari", icon: "M4 6h16M4 12h16M4 18h16M8 3v18" },
-  { to: "/topic-keywords", label: "Bo'lim kalit so'zlari", icon: "M4 7h16M4 12h16M4 17h10" },
+  { to: "/settings", label: "Sozlamalar", icon: "M12 15a3 3 0 100-6 3 3 0 000 6zM4 12h2M18 12h2M12 4v2M12 18v2M6 6l1.5 1.5M16.5 16.5L18 18M18 6l-1.5 1.5M7.5 16.5L6 18" },
 ] as const;
 
 function NavIcon({ d }: { d: string }) {

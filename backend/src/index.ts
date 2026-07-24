@@ -4,6 +4,7 @@ import { bot } from "./bot/bot";
 import { startWeeklyReportJob } from "./jobs/weeklyReport";
 import {
   ensureDefaultModules,
+  ensureDefaultPriorities,
   ensureDefaultRequestTypes,
   ensureDefaultSystems,
   ensureDefaultTopicKeywords,
@@ -14,6 +15,7 @@ async function main(): Promise<void> {
   await ensureDefaultSystems();
   await ensureDefaultRequestTypes();
   await ensureDefaultTopicKeywords();
+  await ensureDefaultPriorities();
 
   const app = createServer();
   app.listen(config.port, () => {

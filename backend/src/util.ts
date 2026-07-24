@@ -15,6 +15,40 @@ export function escapeHtml(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+/**
+ * Erkin yozilgan davomiylikni daqiqaga o'giradi.
+ * Qabul qiladi: "20", "20 daqiqa", "1 soat", "1 soat 20 daqiqa", "1s 20d", "1:20".
+ * Aniqlab bo'lmasa null qaytaradi.
+ */
+export function parseDurationToMinutes(text: string): number | null {
+  const t = text.toLowerCase().trim();
+  if (/^\d+$/.test(t)) return Number(t); // faqat raqam — daqiqa deb olamiz
+  const colon = t.match(/^(\d+)\s*:\s*(\d{1,2})$/);
+  if (colon) return Number(colon[1]) * 60 + Number(colon[2]);
+
+  let minutes = 0;
+  let matched = false;
+  const hour = t.match(/(\d+)\s*(soat|saat|s|h|час|ч)\b/);
+  if (hour) {
+    minutes += Number(hour[1]) * 60;
+    matched = true;
+  }
+  const min = t.match(/(\d+)\s*(daqiqa|daq|min|m|мин|м)\b/);
+  if (min) {
+    minutes += Number(min[1]);
+    matched = true;
+  }
+  return matched ? minutes : null;
+}
+
+/** Daqiqani "X soat Y daqiqa" ko'rinishiga o'giradi */
+export function formatMinutes(min: number): string {
+  if (!min || min <= 0) return "0 daqiqa";
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return [h ? `${h} soat` : "", m ? `${m} daqiqa` : ""].filter(Boolean).join(" ");
+}
+
 export function formatTashkent(date: Date): string {
   return new Intl.DateTimeFormat("uz-UZ", {
     timeZone: "Asia/Tashkent",

@@ -4,13 +4,11 @@ import Layout from "./components/Layout";
 import { getToken } from "./lib/api";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
-import Modules from "./pages/Modules";
 import Operators from "./pages/Operators";
-import RequestTypes from "./pages/RequestTypes";
 import Requests from "./pages/Requests";
 import Schools from "./pages/Schools";
-import Systems from "./pages/Systems";
-import TopicKeywords from "./pages/TopicKeywords";
+import Settings from "./pages/Settings";
+import SupportLog from "./pages/SupportLog";
 
 function RequireAuth({ children }: { children: ReactElement }) {
   if (!getToken()) return <Navigate to="/login" replace />;
@@ -30,12 +28,10 @@ export default function App() {
       >
         <Route path="/" element={<Dashboard />} />
         <Route path="/requests" element={<Requests />} />
+        <Route path="/support-log" element={<SupportLog />} />
         <Route path="/operators" element={<Operators />} />
         <Route path="/schools" element={<Schools />} />
-        <Route path="/modules" element={<Modules />} />
-        <Route path="/systems" element={<Systems />} />
-        <Route path="/request-types" element={<RequestTypes />} />
-        <Route path="/topic-keywords" element={<TopicKeywords />} />
+        <Route path="/settings" element={<Settings />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

@@ -14,6 +14,8 @@ requestsRouter.get("/", wrap(async (req, res) => {
   const where: Prisma.RequestWhereInput = {};
 
   if (typeof q.type === "string" && q.type.trim()) where.type = q.type.trim();
+  if (q.done === "true") where.done = true;
+  if (q.done === "false") where.done = false;
   if (q.systemId && !isNaN(Number(q.systemId))) where.systemId = Number(q.systemId);
   if (q.moduleId && !isNaN(Number(q.moduleId))) where.moduleId = Number(q.moduleId);
   if (q.schoolId && !isNaN(Number(q.schoolId))) where.schoolId = Number(q.schoolId);
@@ -78,8 +80,33 @@ requestsRouter.get("/", wrap(async (req, res) => {
       operator: r.operator.fullName,
       operatorId: r.operatorId,
       description: r.description,
+      done: r.done,
+      doneAt: r.doneAt,
       attachments: r.attachments,
       createdAt: r.createdAt,
     })),
   });
+}));
+
+// Paneldan so'rov statusini o'zgartirish (bajarildi / qayta ochish)
+requestsRouter.patch("/:id", wrap(async (req, res) => {
+  const id = Number(req.params.id);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Noto'g'ri so'rov" });
+    return;
+  }
+  const done = req.body?.done;
+  if (typeof done !== "boolean") {
+    res.status(400).json({ error: "done maydoni true/false bo'lishi kerak" });
+    return;
+  }
+  try {
+    const r = await prisma.request.update({
+      where: { id },
+      data: { done, doneAt: done ? new Date() : null },
+    });
+    res.json({ id: r.id, done: r.done, doneAt: r.doneAt });
+  } catch {
+    res.status(404).json({ error: "So'rov topilmadi" });
+  }
 }));

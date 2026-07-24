@@ -1,4 +1,5 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import { IconArrowDown, IconArrowUp } from "../components/icons";
 import { EmptyNote, ErrorNote, LoadingNote, PageTitle } from "../components/ui";
 import { api } from "../lib/api";
 import { ModuleItem } from "../lib/types";
@@ -134,8 +135,8 @@ export default function Modules() {
                 <tr key={m.id} className={`border-b border-black/5 last:border-0 ${m.isActive ? "" : "opacity-50"}`}>
                   <td className="px-4 py-3">
                     <span className="flex items-center gap-1">
-                      <button disabled={busy || i === 0} onClick={() => move(i, -1)} className={btnCls} title="Yuqoriga">↑</button>
-                      <button disabled={busy || i === modules.length - 1} onClick={() => move(i, 1)} className={btnCls} title="Pastga">↓</button>
+                      <button disabled={busy || i === 0} onClick={() => move(i, -1)} className={btnCls} title="Yuqoriga"><IconArrowUp className="h-3.5 w-3.5" /></button>
+                      <button disabled={busy || i === modules.length - 1} onClick={() => move(i, 1)} className={btnCls} title="Pastga"><IconArrowDown className="h-3.5 w-3.5" /></button>
                     </span>
                   </td>
                   <td className="px-4 py-3">

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { IconCheck, IconClose } from "../components/icons";
 import { Card, EmptyNote, ErrorNote, LoadingNote, PageTitle, StatusBadge } from "../components/ui";
 import { api } from "../lib/api";
 import { formatDate } from "../lib/labels";
@@ -55,16 +56,18 @@ export default function Operators() {
                   <button
                     disabled={busyId === o.id}
                     onClick={() => setStatus(o, "APPROVED")}
-                    className={`${btn} bg-accent text-white`}
+                    className={`${btn} inline-flex items-center gap-1.5 bg-accent text-white`}
                   >
-                    ✅ Tasdiqlash
+                    <IconCheck className="h-4 w-4" />
+                    Tasdiqlash
                   </button>
                   <button
                     disabled={busyId === o.id}
                     onClick={() => setStatus(o, "REJECTED")}
-                    className={`${btn} border border-black/15 text-ink-2`}
+                    className={`${btn} inline-flex items-center gap-1.5 border border-black/15 text-ink-2`}
                   >
-                    ❌ Rad etish
+                    <IconClose className="h-4 w-4" />
+                    Rad etish
                   </button>
                 </div>
               </div>

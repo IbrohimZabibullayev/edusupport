@@ -4,6 +4,7 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  Legend,
   Line,
   LineChart,
   Pie,
@@ -16,8 +17,9 @@ import {
 import { ChartTooltip } from "../components/ChartTooltip";
 import { Card, ErrorNote, PageTitle, StatCard } from "../components/ui";
 import { api } from "../lib/api";
+import { formatMinutes } from "../lib/labels";
 import { useActiveRequestTypes } from "../lib/requestTypes";
-import { Overview, SchoolStat, TrendResponse } from "../lib/types";
+import { ModuleCombined, Overview, SchoolStat, SupportLogStats, TrendResponse } from "../lib/types";
 
 type Period = "week" | "month" | "all";
 
@@ -33,6 +35,8 @@ export default function Dashboard() {
   const [overview, setOverview] = useState<Overview | null>(null);
   const [trend, setTrend] = useState<TrendResponse | null>(null);
   const [schools, setSchools] = useState<SchoolStat[]>([]);
+  const [logStats, setLogStats] = useState<SupportLogStats | null>(null);
+  const [modulesCombined, setModulesCombined] = useState<ModuleCombined[]>([]);
   const [error, setError] = useState("");
   const requestTypes = useActiveRequestTypes();
 
@@ -48,6 +52,8 @@ export default function Dashboard() {
     api<Overview>(`/api/stats/overview${query}`).then(setOverview).catch((e) => setError(e.message));
     api<SchoolStat[]>(`/api/stats/schools${query}`).then(setSchools).catch((e) => setError(e.message));
     api<TrendResponse>(`/api/stats/trend?period=${period}`).then(setTrend).catch((e) => setError(e.message));
+    api<SupportLogStats>(`/api/support-logs/stats${query}`).then(setLogStats).catch((e) => setError(e.message));
+    api<ModuleCombined[]>(`/api/stats/modules-combined${query}`).then(setModulesCombined).catch((e) => setError(e.message));
   }, [query, period]);
 
   const typeData = useMemo(
@@ -62,11 +68,8 @@ export default function Dashboard() {
   );
 
   const moduleData = useMemo(
-    () =>
-      (overview?.byModule ?? [])
-        .map((m) => ({ name: m.name, count: m.count }))
-        .sort((a, b) => b.count - a.count),
-    [overview]
+    () => [...modulesCombined].sort((a, b) => b.requests + b.logs - (a.requests + a.logs)),
+    [modulesCombined]
   );
 
   const total = overview?.total ?? 0;
@@ -102,6 +105,17 @@ export default function Dashboard() {
         ))}
       </div>
 
+      <h2 className="mt-6 mb-3 text-sm font-semibold text-ink-2">Support log (operator o'zi hal qilgan)</h2>
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatCard label="Jami loglar" value={logStats?.total ?? 0} />
+        <StatCard label="Jami sarflangan vaqt" value={formatMinutes(logStats?.totalMinutes ?? 0)} />
+        <StatCard label="Takroriy muammolar" value={logStats?.recurringCount ?? 0} />
+        <StatCard
+          label="O'rtacha vaqt"
+          value={logStats && logStats.total > 0 ? formatMinutes(Math.round(logStats.totalMinutes / logStats.total)) : "—"}
+        />
+      </div>
+
       <Card className="mt-4">
         <h2 className="mb-4 text-sm font-semibold text-ink-2">Trend — jami so'rovlar ({TREND_TITLES[period]})</h2>
         <div className="h-56">
@@ -130,12 +144,15 @@ export default function Dashboard() {
         </div>
       </Card>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-3">
-        <Card>
-          <h2 className="mb-4 text-sm font-semibold text-ink-2">Modul bo'yicha</h2>
-          <div style={{ height: Math.max(220, moduleData.length * 30 + 16) }}>
+      <Card className="mt-4">
+        <h2 className="mb-1 text-sm font-semibold text-ink-2">Modul bo'yicha — guruhga so'rov vs support log</h2>
+        <p className="mb-4 text-xs text-muted">Har modulda qancha muammo guruhga so'rov qilingan (ko'k) va qancha operator o'zi hal qilgan (to'q sariq).</p>
+        {moduleData.length === 0 ? (
+          <p className="py-8 text-center text-sm text-muted">Hozircha ma'lumot yo'q</p>
+        ) : (
+          <div style={{ height: Math.max(220, moduleData.length * 42 + 24) }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={moduleData} layout="vertical" margin={{ top: 0, right: 28, bottom: 0, left: 0 }}>
+              <BarChart data={moduleData} layout="vertical" margin={{ top: 0, right: 28, bottom: 0, left: 0 }} barGap={2}>
                 <XAxis type="number" hide />
                 <YAxis
                   type="category"
@@ -148,19 +165,16 @@ export default function Dashboard() {
                   tickLine={false}
                 />
                 <Tooltip content={<ChartTooltip />} cursor={{ fill: "rgba(11,11,11,0.04)" }} />
-                <Bar
-                  name="So'rovlar"
-                  dataKey="count"
-                  fill="#2a78d6"
-                  radius={[0, 4, 4, 0]}
-                  barSize={16}
-                  label={{ position: "right", fill: "#52514e", fontSize: 12 }}
-                />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Bar name="Guruhga so'rov" dataKey="requests" fill="#2a78d6" radius={[0, 3, 3, 0]} barSize={11} label={{ position: "right", fill: "#52514e", fontSize: 11 }} />
+                <Bar name="Support log" dataKey="logs" fill="#eb6834" radius={[0, 3, 3, 0]} barSize={11} label={{ position: "right", fill: "#52514e", fontSize: 11 }} />
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </Card>
+        )}
+      </Card>
 
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <Card>
           <h2 className="mb-4 text-sm font-semibold text-ink-2">Turi bo'yicha</h2>
           <div className="relative h-44">

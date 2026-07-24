@@ -46,6 +46,21 @@ export default function Schools() {
     }
   };
 
+  const remove = async (s: School) => {
+    const extra =
+      s.requestsCount > 0 || s.logsCount > 0
+        ? `\n\nDIQQAT: ${s.requestsCount} ta so'rov va ${s.logsCount} ta support log ham butunlay o'chiriladi (tarixdan yo'qoladi).`
+        : "";
+    if (!confirm(`"${s.name}" maktabini o'chirasizmi?${extra}`)) return;
+    setError("");
+    try {
+      await api(`/api/schools/${s.id}`, { method: "DELETE" });
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Xatolik yuz berdi");
+    }
+  };
+
   return (
     <div>
       <PageTitle>Maktablar</PageTitle>
@@ -72,16 +87,17 @@ export default function Schools() {
           <thead>
             <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-muted">
               <th className="px-4 py-3">Nomi</th>
-              <th className="px-4 py-3 text-right">So'rovlar soni</th>
+              <th className="px-4 py-3 text-right">So'rovlar</th>
+              <th className="px-4 py-3 text-right">Loglar</th>
               <th className="px-4 py-3">Qo'shilgan</th>
               <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody>
             {!schools ? (
-              <tr><td colSpan={4}><LoadingNote /></td></tr>
+              <tr><td colSpan={5}><LoadingNote /></td></tr>
             ) : schools.length === 0 ? (
-              <tr><td colSpan={4}><EmptyNote text="Maktablar hali qo'shilmagan" /></td></tr>
+              <tr><td colSpan={5}><EmptyNote text="Maktablar hali qo'shilmagan" /></td></tr>
             ) : (
               schools.map((s) => (
                 <tr key={s.id} className="border-b border-black/5 last:border-0 hover:bg-black/[0.02]">
@@ -98,6 +114,7 @@ export default function Schools() {
                     )}
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums">{s.requestsCount}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">{s.logsCount}</td>
                   <td className="whitespace-nowrap px-4 py-3 tabular-nums text-ink-2">{formatDate(s.createdAt)}</td>
                   <td className="px-4 py-3 text-right">
                     {editingId === s.id ? (
@@ -117,12 +134,21 @@ export default function Schools() {
                         </button>
                       </span>
                     ) : (
-                      <button
-                        onClick={() => { setEditingId(s.id); setEditName(s.name); }}
-                        className="rounded-lg border border-black/15 px-3 py-1.5 text-xs font-medium text-ink-2"
-                      >
-                        Tahrirlash
-                      </button>
+                      <span className="flex justify-end gap-2">
+                        <button
+                          onClick={() => { setEditingId(s.id); setEditName(s.name); }}
+                          className="rounded-lg border border-black/15 px-3 py-1.5 text-xs font-medium text-ink-2"
+                        >
+                          Tahrirlash
+                        </button>
+                        <button
+                          onClick={() => remove(s)}
+                          className="rounded-lg border border-danger/30 px-3 py-1.5 text-xs font-medium text-danger"
+                          title="O'chirish"
+                        >
+                          O'chirish
+                        </button>
+                      </span>
                     )}
                   </td>
                 </tr>

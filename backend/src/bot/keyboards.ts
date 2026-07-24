@@ -1,9 +1,9 @@
 import { InlineKeyboard, Keyboard } from "grammy";
 import { moduleLabel } from "./services/modules";
 import { requestTypeLabel } from "./services/requestTypes";
-import { BTN_BACK, BTN_CANCEL, BTN_NEW_REQUEST, BTN_SUBMIT } from "./texts";
+import { BTN_BACK, BTN_CANCEL, BTN_NEW_REQUEST, BTN_NO, BTN_SUBMIT, BTN_SUPPORT_LOG, BTN_YES } from "./texts";
 
-export const mainMenu = new Keyboard().text(BTN_NEW_REQUEST).resized().persistent();
+export const mainMenu = new Keyboard().text(BTN_NEW_REQUEST).text(BTN_SUPPORT_LOG).resized().persistent();
 
 export const contactKeyboard = new Keyboard()
   .requestContact("📱 Raqamni yuborish")
@@ -38,6 +38,22 @@ export function buildModuleKeyboard(modules: { name: string; emoji: string }[]):
 }
 
 export const backCancelKeyboard = new Keyboard().text(BTN_BACK).text(BTN_CANCEL).resized();
+
+/** Prioritet tugmalari bazadagi faol prioritetlardan dinamik quriladi */
+export function buildPriorityKeyboard(priorities: { name: string }[]): Keyboard {
+  const kb = new Keyboard();
+  for (const p of priorities) kb.text(p.name).row();
+  return kb.text(BTN_BACK).text(BTN_CANCEL).resized();
+}
+
+/** Takroriy? — Ha / Yo'q */
+export const yesNoKeyboard = new Keyboard()
+  .text(BTN_YES)
+  .text(BTN_NO)
+  .row()
+  .text(BTN_BACK)
+  .text(BTN_CANCEL)
+  .resized();
 
 /** Izoh bosqichi: bir nechta xabar yig'ilgach "Jo'natish" bosiladi */
 export const submitKeyboard = new Keyboard()

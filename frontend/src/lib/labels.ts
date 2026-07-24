@@ -10,6 +10,14 @@ export const STATUS_LABELS: Record<OperatorStatus, string> = {
   BLOCKED: "Bloklangan",
 };
 
+/** Daqiqani "X soat Y daqiqa" ko'rinishiga o'giradi */
+export function formatMinutes(min: number): string {
+  if (!min || min <= 0) return "0 daqiqa";
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return [h ? `${h} soat` : "", m ? `${m} daqiqa` : ""].filter(Boolean).join(" ");
+}
+
 export function formatDate(iso: string): string {
   return new Intl.DateTimeFormat("uz-UZ", {
     timeZone: "Asia/Tashkent",

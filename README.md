@@ -7,6 +7,8 @@ Ta'lim ERP kompaniyasi uchun support-tracking tizimi:
 
 Operatorlar bot orqali so'rov (bug / muammo-savol / taklif) kiritadi, buglar dev guruhga avtomatik yo'naltiriladi, admin panelda statistika ko'rinadi.
 
+Bundan tashqari operatorlar **Support log** yuritadi — dasturchisiz o'zi (mijoz bilan meet qilib) hal qilgan muammolarni yozib boradi. Bu guruhga yuborilmaydi, faqat hisob-kitob uchun: qaysi modulda qancha muammo, qancha vaqt ketgani, takroriyligi va kim ishlagani. Bot menyusidagi «📋 Support log» tugmasi yoki `/log` orqali kiritiladi, admin panelda jadval + statistika ko'rinadi.
+
 ---
 
 ## 1. Botni BotFather'da yaratish
@@ -158,6 +160,9 @@ Admin panel (React) ──JWT──▶ REST API (Express) ── bitta protsess 
 | `GET /api/modules` · `POST /api/modules` · `PATCH /api/modules/:id` | modullar CRUD (bot tugmalari shu ro'yxatdan chiqadi) |
 | `GET /api/systems` · `POST /api/systems` · `PATCH /api/systems/:id` | tizimlar CRUD |
 | `GET /api/request-types` · `POST` · `PATCH /:id` · `DELETE /:id` | so'rov turlari CRUD (bot tugmalari shu ro'yxatdan) |
+| `GET /api/priorities` · `POST` · `PATCH /:id` · `DELETE /:id` | support log prioritetlari CRUD |
+| `GET /api/support-logs?page=&pageSize=&systemId=&moduleId=&operatorId=&priorityId=&recurring=&from=&to=&search=` | support log ro'yxati |
+| `GET /api/support-logs/stats?...` | support log statistikasi (jami, vaqt, modul/operator/prioritet kesimida) |
 | `GET /api/topic-keywords` · `POST /api/topic-keywords` · `DELETE /api/topic-keywords/:id` | forum bo'lim kalit so'zlari (avto-aniqlash) |
 
 Login'dan tashqari hamma endpoint `Authorization: Bearer <token>` talab qiladi.

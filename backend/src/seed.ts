@@ -75,3 +75,18 @@ export async function ensureDefaultTopicKeywords(): Promise<void> {
   await prisma.topicKeyword.createMany({ data: DEFAULT_TOPIC_KEYWORDS });
   console.log(`✅ ${DEFAULT_TOPIC_KEYWORDS.length} ta standart bo'lim kalit so'zi qo'shildi`);
 }
+
+const DEFAULT_PRIORITIES = [
+  { key: "P1", name: "P1-Shoshilinch", color: "#d64545", sortOrder: 1 },
+  { key: "P2", name: "P2-Yuqori", color: "#eb6834", sortOrder: 2 },
+  { key: "P3", name: "P3-O'rta", color: "#2a78d6", sortOrder: 3 },
+  { key: "P4", name: "P4-Past", color: "#898781", sortOrder: 4 },
+];
+
+/** Prioritetlar jadvali bo'sh bo'lsa standart qiymatlarni qo'shadi */
+export async function ensureDefaultPriorities(): Promise<void> {
+  const count = await prisma.priority.count();
+  if (count > 0) return;
+  await prisma.priority.createMany({ data: DEFAULT_PRIORITIES });
+  console.log(`✅ ${DEFAULT_PRIORITIES.length} ta standart prioritet qo'shildi`);
+}

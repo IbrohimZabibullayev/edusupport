@@ -42,16 +42,17 @@ function isThreadError(err: unknown): boolean {
   return err instanceof GrammyError && /thread not found|TOPIC_CLOSED|TOPIC_DELETED/i.test(err.description);
 }
 
-/** Karta matnini yuboradi, keyin operator yuborgan media xabarlarni nusxalab o'tkazadi */
+/** Karta matnini yuboradi, keyin operator yuborgan media xabarlarni nusxalab o'tkazadi; yuborilgan karta xabarini qaytaradi */
 async function sendCardWithMedia(
   api: Api,
   chatId: string | number,
   text: string,
   refs: MediaRef[],
   threadId?: number
-): Promise<void> {
+): Promise<{ chatId: number; messageId: number }> {
+  let card;
   try {
-    await api.sendMessage(chatId, text, { parse_mode: "HTML", message_thread_id: threadId });
+    card = await api.sendMessage(chatId, text, { parse_mode: "HTML", message_thread_id: threadId });
   } catch (err) {
     if (threadId !== undefined && isThreadError(err)) {
       console.warn(`Bo'lim (${threadId}) topilmadi/yopiq — ${chatId} guruhida General'ga yuboriladi`);
@@ -66,6 +67,7 @@ async function sendCardWithMedia(
       console.error(`Media (${ref.messageId}) nusxalanmadi:`, err);
     }
   }
+  return { chatId: card.chat.id, messageId: card.message_id };
 }
 
 async function sendToAllAdmins(api: Api, text: string, refs: MediaRef[]): Promise<void> {
@@ -138,7 +140,12 @@ export async function routeRequest(api: Api, requestId: number, mediaRefs: Media
 
     if (target) {
       const threadId = await getTopicThreadId(target, request.type);
-      await sendCardWithMedia(api, target, text, mediaRefs, threadId);
+      const card = await sendCardWithMedia(api, target, text, mediaRefs, threadId);
+      // Guruhda "bajarildi" reply orqali statusni topish uchun karta xabarini saqlaymiz
+      await prisma.request.update({
+        where: { id: request.id },
+        data: { cardChatId: String(card.chatId), cardMessageId: card.messageId },
+      });
     } else {
       console.warn("Guruh belgilanmagan (/setgroup) — so'rov adminlarga yuboriladi");
       await sendToAllAdmins(api, text, mediaRefs);
