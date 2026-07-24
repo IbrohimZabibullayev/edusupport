@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { Request as ExpressRequest, Router } from "express";
 import { prisma } from "../../db";
-import { tashkentWeekStart } from "../../util";
+import { tashkentDayStart, tashkentWeekStart } from "../../util";
 import { wrap } from "../middleware/wrap";
 
 export const statsRouter = Router();
@@ -36,6 +36,38 @@ statsRouter.get("/overview", wrap(async (req, res) => {
       .filter((m) => m.isActive || counts.has(m.id))
       .map((m) => ({ id: m.id, name: m.name, emoji: m.emoji, count: counts.get(m.id) ?? 0 })),
   });
+}));
+
+// Tanlangan davrga moslashuvchi trend: hafta→7 kun, oy→30 kun, hammasi→12 hafta
+statsRouter.get("/trend", wrap(async (req, res) => {
+  const period = req.query.period;
+  const isAll = period === "all";
+  const isMonth = period === "month";
+
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const WEEK_MS = 7 * DAY_MS;
+  const count = isAll ? 12 : isMonth ? 30 : 7;
+  const step = isAll ? WEEK_MS : DAY_MS;
+  const start = isAll ? tashkentWeekStart(new Date(), count - 1) : tashkentDayStart(new Date(), count - 1);
+
+  const requests = await prisma.request.findMany({
+    where: { createdAt: { gte: start } },
+    select: { createdAt: true },
+  });
+
+  const labelFmt = new Intl.DateTimeFormat("uz-UZ", { timeZone: "Asia/Tashkent", day: "2-digit", month: "2-digit" });
+  const points = Array.from({ length: count }, (_, i) => ({
+    label: labelFmt.format(new Date(start.getTime() + i * step)),
+    total: 0,
+  }));
+
+  for (const r of requests) {
+    const idx = Math.floor((r.createdAt.getTime() - start.getTime()) / step);
+    if (idx < 0 || idx >= count) continue;
+    points[idx].total++;
+  }
+
+  res.json({ granularity: isAll ? "week" : "day", points });
 }));
 
 statsRouter.get("/weekly", wrap(async (_req, res) => {

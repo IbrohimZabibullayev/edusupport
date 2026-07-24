@@ -1,8 +1,7 @@
-import { RequestType } from "@prisma/client";
 import { prisma } from "../../db";
 import { tashkentWeekStart } from "../../util";
-import { TYPE_LABELS } from "../texts";
 import { moduleLabel } from "./modules";
+import { getActiveRequestTypes, requestTypeLabel } from "./requestTypes";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -27,15 +26,16 @@ function changeLabel(current: number, previous: number): string {
 async function buildReport(title: string, from: Date, to: Date, prevFrom: Date, prevTo: Date): Promise<string> {
   const where = { createdAt: { gte: from, lt: to } };
 
-  const [total, prevTotal, byType, byModule, bySchool] = await Promise.all([
+  const [total, prevTotal, byType, byModule, bySchool, types] = await Promise.all([
     prisma.request.count({ where }),
     prisma.request.count({ where: { createdAt: { gte: prevFrom, lt: prevTo } } }),
     prisma.request.groupBy({ by: ["type"], where, _count: { _all: true } }),
     prisma.request.groupBy({ by: ["moduleId"], where, _count: { _all: true }, orderBy: { _count: { moduleId: "desc" } }, take: 3 }),
     prisma.request.groupBy({ by: ["schoolId"], where, _count: { _all: true }, orderBy: { _count: { schoolId: "desc" } }, take: 3 }),
+    getActiveRequestTypes(),
   ]);
 
-  const typeCount = (t: RequestType) => byType.find((r) => r.type === t)?._count._all ?? 0;
+  const typeCount = (key: string) => byType.find((r) => r.type === key)?._count._all ?? 0;
 
   const [schools, modules] = await Promise.all([
     prisma.school.findMany({ where: { id: { in: bySchool.map((s) => s.schoolId) } } }),
@@ -54,7 +54,7 @@ async function buildReport(title: string, from: Date, to: Date, prevFrom: Date, 
     `Jami so'rovlar: <b>${total}</b> (${changeLabel(total, prevTotal)})`,
     "",
     "<b>Turlari bo'yicha:</b>",
-    ...(Object.keys(TYPE_LABELS) as RequestType[]).map((t) => `${TYPE_LABELS[t]}: ${typeCount(t)}`),
+    ...types.map((t) => `${requestTypeLabel(t)}: ${typeCount(t.key)}`),
   ];
 
   if (byModule.length > 0) {

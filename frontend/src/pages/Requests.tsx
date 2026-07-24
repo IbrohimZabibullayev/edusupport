@@ -2,7 +2,8 @@ import { Fragment, useEffect, useState } from "react";
 import { AttachmentView } from "../components/AttachmentView";
 import { EmptyNote, ErrorNote, LoadingNote, PageTitle, Pagination, TypeBadge } from "../components/ui";
 import { api } from "../lib/api";
-import { formatDate, TYPE_LABELS } from "../lib/labels";
+import { formatDate } from "../lib/labels";
+import { useActiveRequestTypes } from "../lib/requestTypes";
 import { ModuleItem, Operator, RequestsResponse, School, SystemItem } from "../lib/types";
 
 const PAGE_SIZE = 20;
@@ -36,6 +37,7 @@ export default function Requests() {
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
   const [systems, setSystems] = useState<SystemItem[]>([]);
+  const requestTypes = useActiveRequestTypes();
 
   useEffect(() => {
     api<School[]>("/api/schools").then(setSchools).catch(() => {});
@@ -93,8 +95,8 @@ export default function Requests() {
         />
         <select value={filters.type} onChange={(e) => update({ type: e.target.value })} className={selectCls}>
           <option value="">Barcha turlar</option>
-          {Object.entries(TYPE_LABELS).map(([k, v]) => (
-            <option key={k} value={k}>{v}</option>
+          {requestTypes.map((t) => (
+            <option key={t.key} value={t.key}>{t.name}</option>
           ))}
         </select>
         <select value={filters.systemId} onChange={(e) => update({ systemId: e.target.value })} className={selectCls}>

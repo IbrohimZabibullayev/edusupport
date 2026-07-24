@@ -6,9 +6,11 @@ import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
 import Modules from "./pages/Modules";
 import Operators from "./pages/Operators";
+import RequestTypes from "./pages/RequestTypes";
 import Requests from "./pages/Requests";
 import Schools from "./pages/Schools";
 import Systems from "./pages/Systems";
+import TopicKeywords from "./pages/TopicKeywords";
 
 function RequireAuth({ children }: { children: ReactElement }) {
   if (!getToken()) return <Navigate to="/login" replace />;
@@ -32,6 +34,8 @@ export default function App() {
         <Route path="/schools" element={<Schools />} />
         <Route path="/modules" element={<Modules />} />
         <Route path="/systems" element={<Systems />} />
+        <Route path="/request-types" element={<RequestTypes />} />
+        <Route path="/topic-keywords" element={<TopicKeywords />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

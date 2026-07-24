@@ -1,5 +1,4 @@
 import { Context, SessionFlavor } from "grammy";
-import { RequestType } from "@prisma/client";
 
 export type Step =
   | "idle"
@@ -23,7 +22,7 @@ export interface DraftAttachment {
 
 export interface RequestDraft {
   systemId?: number;
-  type?: RequestType;
+  type?: string;
   moduleId?: number;
   schoolId?: number;
   descTexts?: string[];

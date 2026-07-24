@@ -26,6 +26,14 @@ export function formatTashkent(date: Date): string {
   }).format(date);
 }
 
+/** Asia/Tashkent (UTC+5, DST yo'q) bo'yicha kun boshi (00:00) — UTC Date qaytaradi */
+export function tashkentDayStart(date: Date, daysAgo = 0): Date {
+  const TZ_OFFSET_MS = 5 * 60 * 60 * 1000;
+  const local = new Date(date.getTime() + TZ_OFFSET_MS);
+  const midnight = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() - daysAgo);
+  return new Date(midnight - TZ_OFFSET_MS);
+}
+
 /** Asia/Tashkent (UTC+5, DST yo'q) bo'yicha hafta boshi (dushanba 00:00) — UTC Date qaytaradi */
 export function tashkentWeekStart(date: Date, weeksAgo = 0): Date {
   const TZ_OFFSET_MS = 5 * 60 * 60 * 1000;

@@ -6,9 +6,11 @@ import { authRouter } from "./routes/auth";
 import { modulesRouter } from "./routes/modules";
 import { operatorsRouter } from "./routes/operators";
 import { requestsRouter } from "./routes/requests";
+import { requestTypesRouter } from "./routes/requestTypes";
 import { schoolsRouter } from "./routes/schools";
 import { statsRouter } from "./routes/stats";
 import { systemsRouter } from "./routes/systems";
+import { topicKeywordsRouter } from "./routes/topicKeywords";
 
 export function createServer(): Express {
   const app = express();
@@ -25,6 +27,8 @@ export function createServer(): Express {
   app.use("/api/modules", requireAuth, modulesRouter);
   app.use("/api/attachments", requireAuth, attachmentsRouter);
   app.use("/api/systems", requireAuth, systemsRouter);
+  app.use("/api/topic-keywords", requireAuth, topicKeywordsRouter);
+  app.use("/api/request-types", requireAuth, requestTypesRouter);
 
   app.use((_req, res) => res.status(404).json({ error: "Topilmadi" }));
 

@@ -16,19 +16,25 @@ import {
 import { ChartTooltip } from "../components/ChartTooltip";
 import { Card, ErrorNote, PageTitle, StatCard } from "../components/ui";
 import { api } from "../lib/api";
-import { TYPE_COLORS, TYPE_LABELS } from "../lib/labels";
-import { Overview, RequestType, SchoolStat, WeekPoint } from "../lib/types";
+import { useActiveRequestTypes } from "../lib/requestTypes";
+import { Overview, SchoolStat, TrendResponse } from "../lib/types";
 
 type Period = "week" | "month" | "all";
 
 const PERIOD_LABELS: Record<Period, string> = { week: "Hafta", month: "Oy", all: "Hammasi" };
+const TREND_TITLES: Record<Period, string> = {
+  week: "So'nggi 7 kun — kunlik",
+  month: "So'nggi 30 kun — kunlik",
+  all: "So'nggi 12 hafta — haftalik",
+};
 
 export default function Dashboard() {
   const [period, setPeriod] = useState<Period>("week");
   const [overview, setOverview] = useState<Overview | null>(null);
-  const [weekly, setWeekly] = useState<WeekPoint[]>([]);
+  const [trend, setTrend] = useState<TrendResponse | null>(null);
   const [schools, setSchools] = useState<SchoolStat[]>([]);
   const [error, setError] = useState("");
+  const requestTypes = useActiveRequestTypes();
 
   const query = useMemo(() => {
     if (period === "all") return "";
@@ -41,20 +47,18 @@ export default function Dashboard() {
     setError("");
     api<Overview>(`/api/stats/overview${query}`).then(setOverview).catch((e) => setError(e.message));
     api<SchoolStat[]>(`/api/stats/schools${query}`).then(setSchools).catch((e) => setError(e.message));
-  }, [query]);
-
-  useEffect(() => {
-    api<WeekPoint[]>("/api/stats/weekly").then(setWeekly).catch((e) => setError(e.message));
-  }, []);
+    api<TrendResponse>(`/api/stats/trend?period=${period}`).then(setTrend).catch((e) => setError(e.message));
+  }, [query, period]);
 
   const typeData = useMemo(
     () =>
-      (Object.keys(TYPE_LABELS) as RequestType[]).map((t) => ({
-        key: t,
-        name: TYPE_LABELS[t],
-        value: overview?.byType[t] ?? 0,
+      requestTypes.map((t) => ({
+        key: t.key,
+        name: t.name,
+        color: t.color,
+        value: overview?.byType[t.key] ?? 0,
       })),
-    [overview]
+    [overview, requestTypes]
   );
 
   const moduleData = useMemo(
@@ -93,16 +97,16 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard label="Jami so'rovlar" value={total} />
-        <StatCard label="Bug" value={overview?.byType.BUG ?? 0} dotColor={TYPE_COLORS.BUG} />
-        <StatCard label="Muammo-savol" value={overview?.byType.ISSUE ?? 0} dotColor={TYPE_COLORS.ISSUE} />
-        <StatCard label="Taklif" value={overview?.byType.SUGGESTION ?? 0} dotColor={TYPE_COLORS.SUGGESTION} />
+        {typeData.map((d) => (
+          <StatCard key={d.key} label={d.name} value={d.value} dotColor={d.color} />
+        ))}
       </div>
 
       <Card className="mt-4">
-        <h2 className="mb-4 text-sm font-semibold text-ink-2">Haftalik trend — jami so'rovlar (12 hafta)</h2>
+        <h2 className="mb-4 text-sm font-semibold text-ink-2">Trend — jami so'rovlar ({TREND_TITLES[period]})</h2>
         <div className="h-56">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={weekly} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
+            <LineChart data={trend?.points ?? []} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
               <CartesianGrid stroke="#e1e0d9" vertical={false} />
               <XAxis
                 dataKey="label"
@@ -173,7 +177,7 @@ export default function Dashboard() {
                   strokeWidth={2}
                 >
                   {typeData.map((d) => (
-                    <Cell key={d.key} fill={TYPE_COLORS[d.key]} />
+                    <Cell key={d.key} fill={d.color} />
                   ))}
                 </Pie>
                 <Tooltip content={<ChartTooltip />} />
@@ -187,7 +191,7 @@ export default function Dashboard() {
           <ul className="mt-3 space-y-1.5">
             {typeData.map((d) => (
               <li key={d.key} className="flex items-center gap-2 text-sm">
-                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: TYPE_COLORS[d.key] }} />
+                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: d.color }} />
                 <span className="flex-1 text-ink-2">{d.name}</span>
                 <span className="font-medium tabular-nums">{d.value}</span>
                 <span className="w-11 text-right text-xs tabular-nums text-muted">

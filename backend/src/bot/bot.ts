@@ -19,9 +19,16 @@ import {
   handleTypeStep,
   startWizard,
 } from "./handlers/request";
+import { getActiveRequestTypes, requestTypeLabel } from "./services/requestTypes";
+import { learnTopic } from "./services/topics";
 import { PrismaStorage } from "./storage";
 import { BTN_NEW_REQUEST } from "./texts";
 import { MyContext, SessionData } from "./types";
+
+/** Forum guruhda xabar qaysi bo'limda (topic) yozilgan bo'lsa, o'sha bo'lim raqami */
+function threadOf(msg?: { is_topic_message?: boolean; message_thread_id?: number }): number | undefined {
+  return msg?.is_topic_message ? msg.message_thread_id : undefined;
+}
 
 function createBot(): Bot<MyContext> {
   const bot = new Bot<MyContext>(config.botToken);
@@ -30,8 +37,35 @@ function createBot(): Bot<MyContext> {
     console.error("Bot xatosi:", err.error);
   });
 
+  // Bo'limlarni avtomatik o'rganish: guruhdagi xabarlar bo'lim nomini olib keladi —
+  // "Bugs" → BUG, "Savollar" → ISSUE, "Features/Taklif" → SUGGESTION kabi biriktiriladi.
+  // Buning uchun bot guruh xabarlarini ko'ra olishi kerak (guruhda admin bo'lsin yoki privacy o'chiq).
+  bot.use(async (ctx, next) => {
+    const msg = ctx.message;
+    if (msg && ctx.chat && ctx.chat.type !== "private") {
+      const chatId = String(ctx.chat.id);
+      try {
+        if (msg.forum_topic_created) {
+          await learnTopic(chatId, msg.message_thread_id ?? msg.message_id, msg.forum_topic_created.name);
+        } else if (msg.forum_topic_edited?.name && msg.message_thread_id) {
+          await learnTopic(chatId, msg.message_thread_id, msg.forum_topic_edited.name);
+        } else if (msg.is_topic_message && msg.message_thread_id && msg.reply_to_message?.forum_topic_created) {
+          await learnTopic(chatId, msg.message_thread_id, msg.reply_to_message.forum_topic_created.name);
+        }
+      } catch (err) {
+        console.error("Bo'lim avto-o'rganilmadi:", err);
+      }
+    }
+    await next();
+  });
+
   // Guruhda ham ishlaydi — DEV_GROUP_ID ni topish uchun qulay
-  bot.command("chatid", (ctx) => ctx.reply(`Chat ID: <code>${ctx.chat.id}</code>`, { parse_mode: "HTML" }));
+  bot.command("chatid", (ctx) => {
+    const threadId = threadOf(ctx.message);
+    const lines = [`Chat ID: <code>${ctx.chat.id}</code>`];
+    if (threadId) lines.push(`Bo'lim (topic) ID: <code>${threadId}</code>`);
+    return ctx.reply(lines.join("\n"), { parse_mode: "HTML", message_thread_id: threadId });
+  });
 
   // Guruhni bazaga saqlash — .env yoki kodni o'zgartirish shart emas
   const requireAdmin = async (telegramId: number) => {
@@ -57,7 +91,10 @@ function createBot(): Bot<MyContext> {
     const kb = new InlineKeyboard();
     for (const s of systems) kb.text(s.name, `bindgroup:${s.id}`).row();
     kb.text("📥 Umumiy (hamma tizim uchun)", "bindgroup:global");
-    await ctx.reply("Bu guruh qaysi tizimning so'rovlarini qabul qiladi?", { reply_markup: kb });
+    await ctx.reply("Bu guruh qaysi tizimning so'rovlarini qabul qiladi?", {
+      reply_markup: kb,
+      message_thread_id: threadOf(ctx.message),
+    });
   });
 
   bot.callbackQuery(/^bindgroup:(\d+|global)$/, async (ctx) => {
@@ -83,10 +120,77 @@ function createBot(): Bot<MyContext> {
       label = system.name;
     }
     await ctx.answerCallbackQuery();
+    const topicHint = ctx.chat.is_forum
+      ? `\n\nGuruhda bo'limlar (topics) bor — so'rov turlarini bo'limlarga ajratish uchun har bir bo'lim ichida /settopic yozing.`
+      : "";
     try {
       await ctx.editMessageText(
-        `✅ Guruh saqlandi! "${label}" bo'yicha mijozlardan kelgan muammo va fikr-mulohazalar endi shu guruhga yuborib boriladi.`
+        `✅ Guruh saqlandi! "${label}" bo'yicha mijozlardan kelgan muammo va fikr-mulohazalar endi shu guruhga yuborib boriladi.${topicHint}`
       );
+    } catch {
+      // xabar allaqachon o'zgartirilgan bo'lishi mumkin
+    }
+  });
+
+  // /settopic — guruh bo'limi (topic) ichida yoziladi: shu bo'limga qaysi so'rov turlari tushishini belgilaydi
+  bot.command("settopic", async (ctx) => {
+    if (!ctx.from) return;
+    if (!(await requireAdmin(ctx.from.id))) {
+      await ctx.reply("Bu buyruq faqat adminlar uchun.");
+      return;
+    }
+    if (ctx.chat.type === "private") {
+      await ctx.reply("Bu buyruqni guruhdagi kerakli bo'lim (topic) ichida yozing.");
+      return;
+    }
+    const threadId = threadOf(ctx.message);
+    if (!ctx.chat.is_forum) {
+      await ctx.reply("Bu guruhda bo'limlar (topics) yoqilmagan — so'rovlar guruhning o'ziga tushaveradi.");
+      return;
+    }
+    const types = await getActiveRequestTypes();
+    const kb = new InlineKeyboard();
+    for (const t of types) kb.text(requestTypeLabel(t), `bindtopic:${t.key}`).row();
+    await ctx.reply(
+      threadId
+        ? "Shu bo'limga qaysi turdagi so'rovlar tushsin?"
+        : "Bu General (asosiy) bo'lim. Qaysi turni tanlasangiz, o'sha tur uchun bo'lim biriktirmasi o'chiriladi va so'rovlar shu yerga tushadi:",
+      { reply_markup: kb, message_thread_id: threadId }
+    );
+  });
+
+  bot.callbackQuery(/^bindtopic:(.+)$/, async (ctx) => {
+    if (!ctx.from || !ctx.chat) return;
+    if (!(await requireAdmin(ctx.from.id))) {
+      await ctx.answerCallbackQuery({ text: "Faqat adminlar uchun", show_alert: true });
+      return;
+    }
+    const type = ctx.match[1];
+    const typeRow = await prisma.requestType.findUnique({ where: { key: type } });
+    if (!typeRow) {
+      await ctx.answerCallbackQuery({ text: "Tur topilmadi", show_alert: true });
+      return;
+    }
+    const label = requestTypeLabel(typeRow);
+    const chatId = String(ctx.chat.id);
+    const msg = ctx.callbackQuery.message;
+    const threadId = msg && "is_topic_message" in msg ? threadOf(msg) : undefined;
+
+    let note: string;
+    if (threadId !== undefined) {
+      await prisma.groupTopic.upsert({
+        where: { chatId_type: { chatId, type } },
+        create: { chatId, type, threadId, auto: false },
+        update: { threadId, auto: false },
+      });
+      note = `✅ "${label}" so'rovlari endi shu guruhning shu bo'limiga tushadi.`;
+    } else {
+      await prisma.groupTopic.deleteMany({ where: { chatId, type } });
+      note = `✅ "${label}" so'rovlari endi General (asosiy) bo'limga tushadi.`;
+    }
+    await ctx.answerCallbackQuery();
+    try {
+      await ctx.editMessageText(note);
     } catch {
       // xabar allaqachon o'zgartirilgan bo'lishi mumkin
     }
@@ -104,7 +208,9 @@ function createBot(): Bot<MyContext> {
       return;
     }
     await setSetting(SETTING_BACKLOG_CHAT, String(ctx.chat.id));
-    await ctx.reply("✅ Guruh saqlandi! Endi mijozlarning takliflari shu guruhga yuborib boriladi.");
+    await ctx.reply("✅ Guruh saqlandi! Endi mijozlarning takliflari shu guruhga yuborib boriladi.", {
+      message_thread_id: threadOf(ctx.message),
+    });
   });
 
   // Qolgan hamma narsa faqat shaxsiy chatda

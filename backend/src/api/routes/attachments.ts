@@ -1,3 +1,4 @@
+import { GrammyError } from "grammy";
 import { Router } from "express";
 import { bot } from "../../bot/bot";
 import { config } from "../../config";
@@ -38,7 +39,18 @@ attachmentsRouter.get("/:id/file", wrap(async (req, res) => {
     return;
   }
 
-  const file = await bot.api.getFile(attachment.fileId);
+  let file;
+  try {
+    file = await bot.api.getFile(attachment.fileId);
+  } catch (err) {
+    // file_id botga bog'liq: boshqa bot (masalan lokal dev bot) yuklagan yoki muddati o'tgan
+    // faylni bu bot ololmaydi — panelni buzmaslik uchun toza 404 qaytaramiz (stack trace emas)
+    if (err instanceof GrammyError && err.error_code === 400) {
+      res.status(404).json({ error: "Fayl mavjud emas (boshqa bot yuklagan yoki muddati o'tgan)" });
+      return;
+    }
+    throw err;
+  }
   if (!file.file_path) {
     res.status(502).json({ error: "Telegram fayl yo'lini qaytarmadi" });
     return;

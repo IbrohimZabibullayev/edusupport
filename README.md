@@ -31,7 +31,29 @@ Eng oson yo'l — **`/setgroup` buyrug'i** (env sozlash shart emas):
 
 Takliflar chati uchun xuddi shunday `/setbacklog` ishlatiladi (belgilanmasa takliflar adminlarga boradi).
 
-> `.env` dagi `DEV_GROUP_ID`/`BACKLOG_CHAT_ID` zaxira usul sifatida qoladi: bazada qiymat bo'lmasa env'dan olinadi. Chat ID kerak bo'lsa guruhda `/chatid` yozing.
+### Forum guruhlar (bo'limlar / topics)
+
+Agar guruh forum rejimida bo'lsa (Bugs, Features, News kabi bo'limlari bor), so'rov turlari bo'limlarga ajratiladi.
+
+**Avtomatik aniqlash.** Telegram Bot API bo'limlar ro'yxatini bermaydi, lekin bot guruhdagi xabarlar bilan birga keladigan bo'lim nomlaridan o'zi o'rganib boradi va nomiga qarab biriktiradi. Bo'lim nomida quyidagi **kalit so'zlar**dan biri uchrasa, o'sha turdagi so'rovlar shu bo'limga tushadi (standart qiymatlar):
+
+| Bo'lim nomida bor | So'rov turi |
+|---|---|
+| `bug` | 🐞 Bug |
+| `savol`, `muammo`, `aniqlash` | ❓ Muammo-savol |
+| `taklif`, `feature`, `g'oya` | 💡 Taklif |
+
+Kalit so'zlar **admin panelda** («Bo'lim kalit so'zlari» sahifasi) qo'shiladi/o'chiriladi — kodni o'zgartirish shart emas. Masalan bo'lim "Xatolar" deb nomlangan bo'lsa, Bug turiga `xato` so'zini qo'shsangiz kifoya. Katta-kichik harf farqi yo'q.
+
+> **So'rov turlari ham dinamik.** Operator so'rov kiritganda tanlaydigan turlar (Bug / Muammo-savol / Taklif) admin paneldagi **«So'rov turlari»** sahifasida boshqariladi — yangi tur qo'shish, nom/emoji/rang o'zgartirish, faolsizlantirish mumkin. Har bir yangi tur uchun «Bo'lim kalit so'zlari»da unga kalit so'z qo'shsangiz, o'sha turdagi so'rovlar mos bo'limga tushadi.
+
+Shartlari: bot guruh xabarlarini ko'ra olishi kerak — botni guruhda **admin** qiling (yoki BotFather'da Group Privacy'ni o'chiring). Bot bo'limni birinchi marta "ko'rganda" (o'sha bo'limda kimdir biror xabar yozganda, bo'lim yaratilganda yoki nomi o'zgarganda) o'rganadi — botni ulagach har kerakli bo'limda bitta xabar yozib qo'yish kifoya.
+
+**Qo'lda biriktirish (`/settopic`).** Nomlari yuqoridagi qolipga tushmaydigan bo'limlar uchun yoki avtomatikani bekor qilish uchun: kerakli bo'lim ichida `/settopic` yozing va so'rov turini tanlang. Qo'lda biriktirilgan bo'lim ustidan avtomatika hech qachon yozmaydi.
+
+Biriktirilmagan turdagi so'rovlar General (asosiy) bo'limga tushadi. Biriktirmani olib tashlash uchun General'da `/settopic` yozib turini tanlang. Bo'lim o'chirilgan/yopilgan bo'lsa bot avtomatik General'ga yuboradi.
+
+> `.env` dagi `DEV_GROUP_ID`/`BACKLOG_CHAT_ID` zaxira usul sifatida qoladi: bazada qiymat bo'lmasa env'dan olinadi. Chat ID kerak bo'lsa guruhda `/chatid` yozing (bo'lim ichida yozilsa topic ID ham chiqadi).
 
 ## 3. Lokal ishga tushirish
 
@@ -134,5 +156,8 @@ Admin panel (React) ──JWT──▶ REST API (Express) ── bitta protsess 
 | `GET /api/operators` · `PATCH /api/operators/:id` | ro'yxat · status o'zgartirish |
 | `GET /api/schools` · `POST /api/schools` · `PATCH /api/schools/:id` | maktablar CRUD |
 | `GET /api/modules` · `POST /api/modules` · `PATCH /api/modules/:id` | modullar CRUD (bot tugmalari shu ro'yxatdan chiqadi) |
+| `GET /api/systems` · `POST /api/systems` · `PATCH /api/systems/:id` | tizimlar CRUD |
+| `GET /api/request-types` · `POST` · `PATCH /:id` · `DELETE /:id` | so'rov turlari CRUD (bot tugmalari shu ro'yxatdan) |
+| `GET /api/topic-keywords` · `POST /api/topic-keywords` · `DELETE /api/topic-keywords/:id` | forum bo'lim kalit so'zlari (avto-aniqlash) |
 
 Login'dan tashqari hamma endpoint `Authorization: Bearer <token>` talab qiladi.

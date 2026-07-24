@@ -1,6 +1,7 @@
 import { InlineKeyboard, Keyboard } from "grammy";
 import { moduleLabel } from "./services/modules";
-import { BTN_BACK, BTN_CANCEL, BTN_NEW_REQUEST, BTN_SUBMIT, TYPE_LABELS } from "./texts";
+import { requestTypeLabel } from "./services/requestTypes";
+import { BTN_BACK, BTN_CANCEL, BTN_NEW_REQUEST, BTN_SUBMIT } from "./texts";
 
 export const mainMenu = new Keyboard().text(BTN_NEW_REQUEST).resized().persistent();
 
@@ -18,15 +19,12 @@ export function buildSystemKeyboard(systems: { name: string }[]): Keyboard {
   return kb.text(BTN_CANCEL).resized();
 }
 
-export const typeKeyboard = new Keyboard()
-  .text(TYPE_LABELS.BUG)
-  .text(TYPE_LABELS.ISSUE)
-  .row()
-  .text(TYPE_LABELS.SUGGESTION)
-  .row()
-  .text(BTN_BACK)
-  .text(BTN_CANCEL)
-  .resized();
+/** So'rov turi tugmalari bazadagi faol turlardan dinamik quriladi */
+export function buildTypeKeyboard(types: { name: string; emoji: string }[]): Keyboard {
+  const kb = new Keyboard();
+  for (const t of types) kb.text(requestTypeLabel(t)).row();
+  return kb.text(BTN_BACK).text(BTN_CANCEL).resized();
+}
 
 /** Modul tugmalari bazadagi faol modullardan dinamik quriladi (2 ustunda) */
 export function buildModuleKeyboard(modules: { name: string; emoji: string }[]): Keyboard {

@@ -1,5 +1,17 @@
-export type RequestType = "BUG" | "ISSUE" | "SUGGESTION";
+/** So'rov turi kaliti (Request.type da saqlanadi) — endi dinamik, string */
+export type RequestType = string;
 export type OperatorStatus = "PENDING" | "APPROVED" | "REJECTED" | "BLOCKED";
+
+export interface RequestTypeInfo {
+  id: number;
+  key: string;
+  name: string;
+  emoji: string;
+  color: string;
+  isActive: boolean;
+  sortOrder: number;
+  requestsCount: number;
+}
 
 export interface ModuleCount {
   id: number;
@@ -28,19 +40,26 @@ export interface ModuleItem {
   createdAt: string;
 }
 
+export interface TopicKeyword {
+  id: number;
+  type: RequestType;
+  keyword: string;
+}
+
 export interface Overview {
   total: number;
-  byType: Partial<Record<RequestType, number>>;
+  byType: Record<string, number>;
   byModule: ModuleCount[];
 }
 
-export interface WeekPoint {
-  weekStart: string;
+export interface TrendPoint {
   label: string;
   total: number;
-  bug: number;
-  issue: number;
-  suggestion: number;
+}
+
+export interface TrendResponse {
+  granularity: "day" | "week";
+  points: TrendPoint[];
 }
 
 export interface SchoolStat {

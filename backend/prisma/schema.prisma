@@ -14,10 +14,16 @@ enum OperatorStatus {
   BLOCKED
 }
 
-enum RequestType {
-  BUG
-  ISSUE
-  SUGGESTION
+// So'rov turlari (admin panelda boshqariladi). key — Request.type da saqlanadigan barqaror kod.
+model RequestType {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  name      String
+  emoji     String   @default("")
+  color     String   @default("#2a78d6")
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
 }
 
 model Module {
@@ -65,7 +71,7 @@ model School {
 model Request {
   id           Int         @id @default(autoincrement())
   ticketNumber Int         @unique @default(autoincrement())
-  type         RequestType
+  type         String
   systemId     Int?
   system       System?     @relation(fields: [systemId], references: [id])
   moduleId     Int
@@ -93,6 +99,30 @@ model RequestAttachment {
   createdAt DateTime @default(now())
 
   @@index([requestId])
+}
+
+// Bo'lim nomini so'rov turiga bog'laydigan kalit so'z (admin panelda tahrirlanadi).
+// Bo'lim nomida shu so'z bo'lsa (kichik harf, qism-satr), o'sha tur avto-biriktiriladi.
+model TopicKeyword {
+  id        Int      @id @default(autoincrement())
+  type      String
+  keyword   String
+  createdAt DateTime @default(now())
+
+  @@unique([type, keyword])
+}
+
+// Forum guruh bo'limi: qaysi guruhda qaysi so'rov turi qaysi bo'limga (topic) tushishi.
+// auto=true — bot bo'lim nomidan o'zi aniqlagan; auto=false — admin /settopic bilan qo'lda biriktirgan
+model GroupTopic {
+  id        Int      @id @default(autoincrement())
+  chatId    String
+  type      String
+  threadId  Int
+  auto      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@unique([chatId, type])
 }
 
 model BotSession {

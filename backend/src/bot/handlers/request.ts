@@ -4,14 +4,15 @@ import {
   backCancelKeyboard,
   buildModuleKeyboard,
   buildSystemKeyboard,
+  buildTypeKeyboard,
   mainMenu,
   submitKeyboard,
-  typeKeyboard,
 } from "../keyboards";
 import { getActiveModules, moduleLabel } from "../services/modules";
 import { getActiveSystems } from "../services/systems";
+import { getActiveRequestTypes, requestTypeLabel, requestTypeLabelByKey } from "../services/requestTypes";
 import { notifyAdmins, routeRequest } from "../services/notify";
-import { BTN_BACK, BTN_CANCEL, BTN_SUBMIT, LABEL_TO_TYPE, TYPE_LABELS } from "../texts";
+import { BTN_BACK, BTN_CANCEL, BTN_SUBMIT } from "../texts";
 import { MyContext } from "../types";
 import { requireApprovedOperator } from "./registration";
 
@@ -36,7 +37,7 @@ export async function startWizard(ctx: MyContext): Promise<void> {
     await ctx.reply(ASK_SYSTEM, { reply_markup: buildSystemKeyboard(systems) });
   } else {
     ctx.session.step = "req_type";
-    await ctx.reply(ASK_TYPE, { reply_markup: typeKeyboard });
+    await ctx.reply(ASK_TYPE, { reply_markup: buildTypeKeyboard(await getActiveRequestTypes()) });
   }
 }
 
@@ -52,7 +53,7 @@ export async function handleSystemStep(ctx: MyContext, text: string): Promise<vo
   }
   ctx.session.draft = { ...ctx.session.draft, systemId: chosen.id };
   ctx.session.step = "req_type";
-  await ctx.reply(ASK_TYPE, { reply_markup: typeKeyboard });
+  await ctx.reply(ASK_TYPE, { reply_markup: buildTypeKeyboard(await getActiveRequestTypes()) });
 }
 
 async function cancelWizard(ctx: MyContext): Promise<void> {
@@ -64,12 +65,13 @@ async function cancelWizard(ctx: MyContext): Promise<void> {
 export async function handleTypeStep(ctx: MyContext, text: string): Promise<void> {
   if (text === BTN_CANCEL) return cancelWizard(ctx);
   if (text === BTN_BACK) return startWizard(ctx);
-  const type = LABEL_TO_TYPE[text];
-  if (!type) {
-    await ctx.reply("Iltimos, pastdagi tugmalardan birini tanlang.", { reply_markup: typeKeyboard });
+  const types = await getActiveRequestTypes();
+  const chosen = types.find((t) => requestTypeLabel(t) === text);
+  if (!chosen) {
+    await ctx.reply("Iltimos, pastdagi tugmalardan birini tanlang.", { reply_markup: buildTypeKeyboard(types) });
     return;
   }
-  ctx.session.draft = { ...ctx.session.draft, type };
+  ctx.session.draft = { ...ctx.session.draft, type: chosen.key };
   ctx.session.step = "req_module";
   await ctx.reply(ASK_MODULE, { reply_markup: buildModuleKeyboard(await getActiveModules()) });
 }
@@ -78,7 +80,7 @@ export async function handleModuleStep(ctx: MyContext, text: string): Promise<vo
   if (text === BTN_CANCEL) return cancelWizard(ctx);
   if (text === BTN_BACK) {
     ctx.session.step = "req_type";
-    await ctx.reply(ASK_TYPE, { reply_markup: typeKeyboard });
+    await ctx.reply(ASK_TYPE, { reply_markup: buildTypeKeyboard(await getActiveRequestTypes()) });
     return;
   }
   const modules = await getActiveModules();
@@ -228,11 +230,12 @@ async function submitRequest(ctx: MyContext): Promise<void> {
   ctx.session.step = "idle";
   ctx.session.draft = undefined;
 
+  const typeLabel = await requestTypeLabelByKey(request.type);
   await ctx.reply(
     [
       `✅ So'rov qabul qilindi! Ticket: <code>${ticketId(request.ticketNumber)}</code>`,
       "",
-      `Turi: ${TYPE_LABELS[request.type]}`,
+      `Turi: ${escapeHtml(typeLabel)}`,
       `Modul: ${escapeHtml(moduleLabel(request.module))}`,
       `Maktab: ${escapeHtml(request.school.name)}`,
       ...(attachments.length > 0 ? [`📎 Biriktirilgan fayllar: ${attachments.length} ta`] : []),

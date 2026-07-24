@@ -9,6 +9,8 @@ const NAV_ITEMS = [
   { to: "/schools", label: "Maktablar", icon: "M12 3l9 5-9 5-9-5zM5 12v5l7 4 7-4v-5" },
   { to: "/modules", label: "Modullar", icon: "M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" },
   { to: "/systems", label: "Tizimlar", icon: "M3 5h18v11H3zM8 20h8M12 16v4" },
+  { to: "/request-types", label: "So'rov turlari", icon: "M4 6h16M4 12h16M4 18h16M8 3v18" },
+  { to: "/topic-keywords", label: "Bo'lim kalit so'zlari", icon: "M4 7h16M4 12h16M4 17h10" },
 ] as const;
 
 function NavIcon({ d }: { d: string }) {

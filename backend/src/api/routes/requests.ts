@@ -1,12 +1,10 @@
-import { Prisma, RequestType } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { Router } from "express";
 import { prisma } from "../../db";
 import { ticketId } from "../../util";
 import { wrap } from "../middleware/wrap";
 
 export const requestsRouter = Router();
-
-const TYPES = new Set<string>(["BUG", "ISSUE", "SUGGESTION"]);
 
 requestsRouter.get("/", wrap(async (req, res) => {
   const q = req.query;
@@ -15,7 +13,7 @@ requestsRouter.get("/", wrap(async (req, res) => {
 
   const where: Prisma.RequestWhereInput = {};
 
-  if (typeof q.type === "string" && TYPES.has(q.type)) where.type = q.type as RequestType;
+  if (typeof q.type === "string" && q.type.trim()) where.type = q.type.trim();
   if (q.systemId && !isNaN(Number(q.systemId))) where.systemId = Number(q.systemId);
   if (q.moduleId && !isNaN(Number(q.moduleId))) where.moduleId = Number(q.moduleId);
   if (q.schoolId && !isNaN(Number(q.schoolId))) where.schoolId = Number(q.schoolId);

@@ -1,10 +1,9 @@
-import { Api, InlineKeyboard } from "grammy";
-import { RequestType } from "@prisma/client";
+import { Api, GrammyError, InlineKeyboard } from "grammy";
 import { prisma } from "../../db";
 import { getBacklogChatId, getDevGroupId } from "../../settings";
 import { escapeHtml, formatTashkent, ticketId } from "../../util";
-import { TYPE_LABELS } from "../texts";
 import { moduleLabel } from "./modules";
+import { requestTypeLabelByKey } from "./requestTypes";
 
 export interface MediaRef {
   chatId: number;
@@ -32,12 +31,37 @@ export async function notifyAdmins(api: Api, text: string, keyboard?: InlineKeyb
   return sent;
 }
 
+/** Guruh + so'rov turi uchun biriktirilgan bo'lim (topic) raqami; biriktirilmagan bo'lsa undefined */
+async function getTopicThreadId(chatId: string, type: string): Promise<number | undefined> {
+  const row = await prisma.groupTopic.findUnique({ where: { chatId_type: { chatId, type } } });
+  return row?.threadId;
+}
+
+/** Bo'lim o'chirilgan yoki yopilgan bo'lsa Telegram shunday xato qaytaradi */
+function isThreadError(err: unknown): boolean {
+  return err instanceof GrammyError && /thread not found|TOPIC_CLOSED|TOPIC_DELETED/i.test(err.description);
+}
+
 /** Karta matnini yuboradi, keyin operator yuborgan media xabarlarni nusxalab o'tkazadi */
-async function sendCardWithMedia(api: Api, chatId: string | number, text: string, refs: MediaRef[]): Promise<void> {
-  await api.sendMessage(chatId, text, { parse_mode: "HTML" });
+async function sendCardWithMedia(
+  api: Api,
+  chatId: string | number,
+  text: string,
+  refs: MediaRef[],
+  threadId?: number
+): Promise<void> {
+  try {
+    await api.sendMessage(chatId, text, { parse_mode: "HTML", message_thread_id: threadId });
+  } catch (err) {
+    if (threadId !== undefined && isThreadError(err)) {
+      console.warn(`Bo'lim (${threadId}) topilmadi/yopiq — ${chatId} guruhida General'ga yuboriladi`);
+      return sendCardWithMedia(api, chatId, text, refs);
+    }
+    throw err;
+  }
   for (const ref of refs) {
     try {
-      await api.copyMessage(chatId, ref.chatId, ref.messageId);
+      await api.copyMessage(chatId, ref.chatId, ref.messageId, { message_thread_id: threadId });
     } catch (err) {
       console.error(`Media (${ref.messageId}) nusxalanmadi:`, err);
     }
@@ -59,29 +83,32 @@ async function sendToAllAdmins(api: Api, text: string, refs: MediaRef[]): Promis
   }
 }
 
-function requestCard(request: {
-  ticketNumber: number;
-  type: RequestType;
-  description: string;
-  createdAt: Date;
-  system: { name: string } | null;
-  module: { name: string; emoji: string };
-  school: { name: string };
-  operator: { fullName: string; username: string | null };
-}): string {
+function requestCard(
+  request: {
+    ticketNumber: number;
+    description: string;
+    createdAt: Date;
+    system: { name: string } | null;
+    module: { name: string; emoji: string };
+    school: { name: string };
+    operator: { fullName: string; username: string | null };
+  },
+  typeLabel: string
+): string {
   const op = request.operator;
   const operatorLine = op.username
     ? `${escapeHtml(op.fullName)} (@${escapeHtml(op.username)})`
     : escapeHtml(op.fullName);
   return [
-    `${TYPE_LABELS[request.type]} — <code>${ticketId(request.ticketNumber)}</code>`,
+    `${escapeHtml(typeLabel)} — <code>${ticketId(request.ticketNumber)}</code>`,
     ...(request.system ? [`🖥 Tizim: ${escapeHtml(request.system.name)}`] : []),
     `🧩 Modul: ${escapeHtml(moduleLabel(request.module))}`,
     `🏫 Maktab: ${escapeHtml(request.school.name)}`,
     `👤 Operator: ${operatorLine}`,
     `🕒 Vaqt: ${formatTashkent(request.createdAt)}`,
     "",
-    `📝 ${escapeHtml(request.description)}`,
+    "💬 <b>Mijoz murojaati:</b>",
+    `<blockquote>${escapeHtml(request.description)}</blockquote>`,
   ].join("\n");
 }
 
@@ -93,7 +120,7 @@ export async function routeRequest(api: Api, requestId: number, mediaRefs: Media
   });
   if (!request) return;
 
-  const text = requestCard(request);
+  const text = requestCard(request, await requestTypeLabelByKey(request.type));
 
   try {
     // Avval tizimning o'z guruhi; taklif uchun backlog chat belgilangan bo'lsa — o'sha yerga;
@@ -110,7 +137,8 @@ export async function routeRequest(api: Api, requestId: number, mediaRefs: Media
     }
 
     if (target) {
-      await sendCardWithMedia(api, target, text, mediaRefs);
+      const threadId = await getTopicThreadId(target, request.type);
+      await sendCardWithMedia(api, target, text, mediaRefs, threadId);
     } else {
       console.warn("Guruh belgilanmagan (/setgroup) — so'rov adminlarga yuboriladi");
       await sendToAllAdmins(api, text, mediaRefs);

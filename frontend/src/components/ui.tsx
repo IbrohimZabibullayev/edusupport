@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
-import { STATUS_LABELS, TYPE_COLORS, TYPE_LABELS } from "../lib/labels";
+import { FALLBACK_TYPE_COLOR, STATUS_LABELS } from "../lib/labels";
+import { useRequestTypes } from "../lib/requestTypes";
 import { OperatorStatus, RequestType } from "../lib/types";
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
@@ -28,10 +29,11 @@ export function StatCard({ label, value, dotColor }: { label: string; value: num
 }
 
 export function TypeBadge({ type }: { type: RequestType }) {
+  const info = useRequestTypes().find((t) => t.key === type);
   return (
     <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm">
-      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: TYPE_COLORS[type] }} />
-      {TYPE_LABELS[type]}
+      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: info?.color ?? FALLBACK_TYPE_COLOR }} />
+      {info?.name ?? type}
     </span>
   );
 }
