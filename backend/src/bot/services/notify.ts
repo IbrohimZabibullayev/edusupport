@@ -140,6 +140,12 @@ export async function routeRequest(api: Api, requestId: number, mediaRefs: Media
 
     if (target) {
       const threadId = await getTopicThreadId(target, request.type);
+      if (threadId === undefined) {
+        console.warn(
+          `${ticketId(request.ticketNumber)} (${request.type}) uchun ${target} guruhida bo'lim biriktirilmagan — General'ga tushadi. ` +
+            `Kerakli bo'lim ichida /settopic yozing.`
+        );
+      }
       const card = await sendCardWithMedia(api, target, text, mediaRefs, threadId);
       // Guruhda "bajarildi" reply orqali statusni topish uchun karta xabarini saqlaymiz
       await prisma.request.update({

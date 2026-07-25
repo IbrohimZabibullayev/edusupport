@@ -60,7 +60,7 @@ function createBot(): Bot<MyContext> {
           await learnTopic(chatId, msg.message_thread_id ?? msg.message_id, msg.forum_topic_created.name);
         } else if (msg.forum_topic_edited?.name && msg.message_thread_id) {
           await learnTopic(chatId, msg.message_thread_id, msg.forum_topic_edited.name);
-        } else if (msg.is_topic_message && msg.message_thread_id && msg.reply_to_message?.forum_topic_created) {
+        } else if (msg.message_thread_id && msg.reply_to_message?.forum_topic_created) {
           await learnTopic(chatId, msg.message_thread_id, msg.reply_to_message.forum_topic_created.name);
         }
       } catch (err) {
@@ -161,7 +161,9 @@ function createBot(): Bot<MyContext> {
     }
     const types = await getActiveRequestTypes();
     const kb = new InlineKeyboard();
-    for (const t of types) kb.text(requestTypeLabel(t), `bindtopic:${t.key}`).row();
+    // Bo'lim raqamini tugmaning o'ziga yozib qo'yamiz — tugma bosilganda uni
+    // bot xabaridan qayta topishga urinmaymiz (0 = General/asosiy bo'lim)
+    for (const t of types) kb.text(requestTypeLabel(t), `bindtopic:${t.key}:${threadId ?? 0}`).row();
     await ctx.reply(
       threadId
         ? "Shu bo'limga qaysi turdagi so'rovlar tushsin?"
@@ -170,7 +172,7 @@ function createBot(): Bot<MyContext> {
     );
   });
 
-  bot.callbackQuery(/^bindtopic:(.+)$/, async (ctx) => {
+  bot.callbackQuery(/^bindtopic:([^:]+)(?::(\d+))?$/, async (ctx) => {
     if (!ctx.from || !ctx.chat) return;
     if (!(await requireAdmin(ctx.from.id))) {
       await ctx.answerCallbackQuery({ text: "Faqat adminlar uchun", show_alert: true });
@@ -184,8 +186,15 @@ function createBot(): Bot<MyContext> {
     }
     const label = requestTypeLabel(typeRow);
     const chatId = String(ctx.chat.id);
+    // Tugmadagi raqam ustuvor; eski (raqamsiz) tugmalar uchun xabardan olamiz
     const msg = ctx.callbackQuery.message;
-    const threadId = msg && "is_topic_message" in msg ? threadOf(msg) : undefined;
+    const fromButton = ctx.match[2] ? Number(ctx.match[2]) : undefined;
+    const threadId =
+      fromButton !== undefined
+        ? fromButton || undefined
+        : msg && "is_topic_message" in msg
+          ? threadOf(msg)
+          : undefined;
 
     let note: string;
     if (threadId !== undefined) {
@@ -205,6 +214,42 @@ function createBot(): Bot<MyContext> {
     } catch {
       // xabar allaqachon o'zgartirilgan bo'lishi mumkin
     }
+  });
+
+  // /topics — shu guruhda qaysi tur qaysi bo'limga biriktirilganini ko'rsatadi (tekshirish uchun)
+  bot.command("topics", async (ctx) => {
+    if (!ctx.from) return;
+    if (!(await requireAdmin(ctx.from.id))) {
+      await ctx.reply("Bu buyruq faqat adminlar uchun.");
+      return;
+    }
+    if (ctx.chat.type === "private") {
+      await ctx.reply("Bu buyruqni kerakli guruhning ichida yozing.");
+      return;
+    }
+    const chatId = String(ctx.chat.id);
+    const [types, bindings] = await Promise.all([
+      getActiveRequestTypes(),
+      prisma.groupTopic.findMany({ where: { chatId } }),
+    ]);
+    const byType = new Map(bindings.map((b) => [b.type, b]));
+    const lines = types.map((t) => {
+      const b = byType.get(t.key);
+      if (!b) return `• ${requestTypeLabel(t)} → General (biriktirilmagan)`;
+      return `• ${requestTypeLabel(t)} → bo'lim #${b.threadId} (${b.auto ? "avto" : "qo'lda"})`;
+    });
+    const here = threadOf(ctx.message);
+    await ctx.reply(
+      [
+        `Guruh: <code>${chatId}</code>`,
+        here ? `Siz turgan bo'lim: <code>${here}</code>` : "Siz General (asosiy) bo'limdasiz",
+        "",
+        ...lines,
+        "",
+        "Biriktirish uchun kerakli bo'lim ichiga kirib /settopic yozing.",
+      ].join("\n"),
+      { parse_mode: "HTML", message_thread_id: here }
+    );
   });
 
   // /setbacklog — takliflar uchun umumiy chat

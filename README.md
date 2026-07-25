@@ -49,9 +49,13 @@ Kalit so'zlar **admin panelda** («Bo'lim kalit so'zlari» sahifasi) qo'shiladi/
 
 > **So'rov turlari ham dinamik.** Operator so'rov kiritganda tanlaydigan turlar (Bug / Muammo-savol / Taklif) admin paneldagi **«So'rov turlari»** sahifasida boshqariladi — yangi tur qo'shish, nom/emoji/rang o'zgartirish, faolsizlantirish mumkin. Har bir yangi tur uchun «Bo'lim kalit so'zlari»da unga kalit so'z qo'shsangiz, o'sha turdagi so'rovlar mos bo'limga tushadi.
 
-Shartlari: bot guruh xabarlarini ko'ra olishi kerak — botni guruhda **admin** qiling (yoki BotFather'da Group Privacy'ni o'chiring). Bot bo'limni birinchi marta "ko'rganda" (o'sha bo'limda kimdir biror xabar yozganda, bo'lim yaratilganda yoki nomi o'zgarganda) o'rganadi — botni ulagach har kerakli bo'limda bitta xabar yozib qo'yish kifoya.
+⚠️ **Avtomatika faqat yangi bo'limlarni tutadi.** Telegram botga bo'lim nomini faqat uch holatda yuboradi: bo'lim **yaratilganda**, **nomi o'zgartirilganda** va o'sha bo'limning yaratilish xabariga reply qilinganda. Bot guruhga qo'shilishidan **oldin** mavjud bo'lgan bo'limlar (Bugs, Features, News) shu sababli avtomatik biriktirilmaydi — ularning nomi botga hech qachon kelmaydi. Bunday bo'limlar uchun `/settopic` ishlating (yoki bo'lim nomini o'zgartirib qo'ying — masalan "Features" → "Features " → orqaga; nom o'zgarishi botga yetib boradi).
 
-**Qo'lda biriktirish (`/settopic`).** Nomlari yuqoridagi qolipga tushmaydigan bo'limlar uchun yoki avtomatikani bekor qilish uchun: kerakli bo'lim ichida `/settopic` yozing va so'rov turini tanlang. Qo'lda biriktirilgan bo'lim ustidan avtomatika hech qachon yozmaydi.
+Shartlari: bot guruh xabarlarini ko'ra olishi kerak — botni guruhda **admin** qiling (yoki BotFather'da Group Privacy'ni o'chiring).
+
+**Qo'lda biriktirish (`/settopic`).** Eng ishonchli usul. Nomlari yuqoridagi qolipga tushmaydigan yoki bot qo'shilishidan oldin mavjud bo'lgan bo'limlar uchun: kerakli bo'lim ichida `/settopic` yozing va so'rov turini tanlang. Qo'lda biriktirilgan bo'lim ustidan avtomatika hech qachon yozmaydi.
+
+**Tekshirish (`/topics`).** Guruhda `/topics` yozsangiz, har bir so'rov turi qaysi bo'limga (yoki General'ga) tushayotgani ko'rinadi.
 
 Biriktirilmagan turdagi so'rovlar General (asosiy) bo'limga tushadi. Biriktirmani olib tashlash uchun General'da `/settopic` yozib turini tanlang. Bo'lim o'chirilgan/yopilgan bo'lsa bot avtomatik General'ga yuboradi.
 
