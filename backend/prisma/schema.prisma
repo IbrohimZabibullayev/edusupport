@@ -127,9 +127,23 @@ model Request {
   createdAt    DateTime    @default(now())
   attachments  RequestAttachment[]
 
+  // Kim bajarildi deb belgilagani (guruhdagi tugma orqali — operator bo'lishi shart emas)
+  doneByTgId   String?
+  doneByName   String?
+
+  // Mas'ul odam: guruhdagi dev, botda ro'yxatdan o'tmagan bo'lishi mumkin —
+  // shuning uchun Operator relatsiyasi emas, Telegram ma'lumotlari saqlanadi
+  assigneeTgId     String?
+  assigneeName     String?
+  assigneeUsername String?
+  deadline         DateTime?
+  /** Oxirgi eslatma yuborilgan payt — kuniga bir marta eslatish uchun */
+  remindedAt       DateTime?
+
   @@index([createdAt])
   @@index([type])
   @@index([moduleId])
+  @@index([deadline])
 }
 
 model RequestAttachment {

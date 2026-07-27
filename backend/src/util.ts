@@ -49,6 +49,34 @@ export function formatMinutes(min: number): string {
   return [h ? `${h} soat` : "", m ? `${m} daqiqa` : ""].filter(Boolean).join(" ");
 }
 
+/** Ikki payt orasidagi masofa: "2 kun 4 soat", "3 soat", "25 daqiqa" */
+export function formatSpan(from: Date, to: Date): string {
+  const min = Math.max(0, Math.round((to.getTime() - from.getTime()) / 60000));
+  const days = Math.floor(min / 1440);
+  const hours = Math.floor((min % 1440) / 60);
+  if (days > 0) return [`${days} kun`, hours ? `${hours} soat` : ""].filter(Boolean).join(" ");
+  if (hours > 0) return `${hours} soat`;
+  return `${min} daqiqa`;
+}
+
+/** Faqat sana: "29.07.2026" */
+export function formatTashkentDate(date: Date): string {
+  return new Intl.DateTimeFormat("uz-UZ", {
+    timeZone: "Asia/Tashkent",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(date);
+}
+
+/** Asia/Tashkent bo'yicha kun oxiri (23:59) — bugundan `plusDays` keyin */
+export function tashkentDayEnd(date: Date, plusDays = 0): Date {
+  const TZ_OFFSET_MS = 5 * 60 * 60 * 1000;
+  const local = new Date(date.getTime() + TZ_OFFSET_MS);
+  const end = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() + plusDays, 23, 59, 0);
+  return new Date(end - TZ_OFFSET_MS);
+}
+
 export function formatTashkent(date: Date): string {
   return new Intl.DateTimeFormat("uz-UZ", {
     timeZone: "Asia/Tashkent",

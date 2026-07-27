@@ -73,6 +73,26 @@ Biriktirilmagan turdagi so'rovlar General (asosiy) bo'limga tushadi. Biriktirman
 
 > `.env` dagi `DEV_GROUP_ID`/`BACKLOG_CHAT_ID` zaxira usul sifatida qoladi: bazada qiymat bo'lmasa env'dan olinadi. Chat ID kerak bo'lsa guruhda `/chatid` yozing (bo'lim ichida yozilsa topic ID ham chiqadi).
 
+### So'rovning guruhdagi hayoti (mas'ul, muddat, bajarildi)
+
+Har bir karta ostida tugmalar turadi — hech narsa yozish kerak emas:
+
+| Tugma | Nima qiladi |
+|---|---|
+| ✅ **Bajarildi** | So'rovni yopadi, **kim bosgani** bazaga yoziladi, karta yangilanadi va **operatorga DM boradi** |
+| 🙋 **Men olaman** | Bosgan odam mas'ul bo'ladi |
+| 👤 **Boshqaga berish** | Guruh **adminlari** ro'yxatidan mas'ul tanlanadi va o'sha odam tag qilinadi |
+| ⏰ **Muddat** | Bugun / Ertaga / 3 kun / 1 hafta |
+| 🔄 **Qayta ochish** | Yopilgan so'rovni qaytaradi va guruhga xabar beradi |
+
+**Nega tugma, kalit so'z emas?** Matn bilan qilinsa inkorni ajratib bo'lmaydi — "hali bajaril**ma**di" deb yozgan odam tiketni yopib yuborishi mumkin. Tugmada bunday xato yo'q va kim bosgani aniq bo'ladi. Eski `/bajarildi` buyrug'i (kartaga reply qilib) ishlashda davom etadi.
+
+**Muddat eslatmasi.** Har kuni **09:00 (Asia/Tashkent)** bot muddati bugun tugaydigan va kechikkan, hali yopilmagan so'rovlarni topadi va o'sha kartaga reply qilib mas'ulni tag qiladi: «bu taskda o'zgarish bormi?» — ostida `✅ Bajarildi` va `⏰ +1 kun` tugmalari bilan. Kechikkan so'rov yopilguncha har kuni eslatiladi (kuniga bir marta).
+
+> ℹ️ **Nega mas'ul ro'yxati faqat adminlardan?** Telegram Bot API guruhning oddiy a'zolari ro'yxatini bermaydi — faqat `getChatAdministrators` bor. Shuning uchun devlarni guruhda admin qiling, yoki ular «🙋 Men olaman» tugmasini o'zlari bossin (bu har doim ishlaydi).
+>
+> ℹ️ **Nega eslatma guruhda, DM'da emas?** Bot o'zi birinchi bo'lib hech kimga DM yoza olmaydi — odam avval botga `/start` bosishi kerak. Devlar buni qilmagan bo'lishi mumkin, shuning uchun eslatma guruhda tag orqali boradi (tag baribir bildirishnoma beradi). Operatorga esa DM boradi, chunki u botda ro'yxatdan o'tgan.
+
 ## 3. Lokal ishga tushirish
 
 Talablar: Node.js 20+, PostgreSQL (lokal yoki Docker).

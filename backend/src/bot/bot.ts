@@ -43,6 +43,16 @@ import {
   handleLogTime,
   startLogWizard,
 } from "./handlers/supportLog";
+import {
+  handleAssignMenu,
+  handleAssignPick,
+  handleCardBack,
+  handleClaim,
+  handleDone,
+  handleDueMenu,
+  handleDueSet,
+  handleReopen,
+} from "./handlers/tracking";
 import { getActiveRequestTypes, requestTypeLabel } from "./services/requestTypes";
 import { learnTopic } from "./services/topics";
 import { PrismaStorage } from "./storage";
@@ -316,6 +326,17 @@ function createBot(): Bot<MyContext> {
       message_thread_id: threadId,
     });
   });
+
+  // So'rov kartasidagi tugmalar — guruhda turadi, shuning uchun "faqat shaxsiy chat"
+  // filtridan oldin. "Qayta ochish" operatorning shaxsiy chatidan ham bosiladi.
+  bot.callbackQuery(/^rq:done:(\d+)$/, (ctx) => handleDone(ctx, Number(ctx.match[1])));
+  bot.callbackQuery(/^rq:reopen:(\d+)$/, (ctx) => handleReopen(ctx, Number(ctx.match[1])));
+  bot.callbackQuery(/^rq:claim:(\d+)$/, (ctx) => handleClaim(ctx, Number(ctx.match[1])));
+  bot.callbackQuery(/^rq:assign:(\d+)$/, (ctx) => handleAssignMenu(ctx, Number(ctx.match[1])));
+  bot.callbackQuery(/^rq:asg:(\d+):(\d+)$/, (ctx) => handleAssignPick(ctx, Number(ctx.match[1]), Number(ctx.match[2])));
+  bot.callbackQuery(/^rq:due:(\d+)$/, (ctx) => handleDueMenu(ctx, Number(ctx.match[1])));
+  bot.callbackQuery(/^rq:dueset:(\d+):(-?\d+)$/, (ctx) => handleDueSet(ctx, Number(ctx.match[1]), Number(ctx.match[2])));
+  bot.callbackQuery(/^rq:back:(\d+)$/, (ctx) => handleCardBack(ctx, Number(ctx.match[1])));
 
   // Qolgan hamma narsa faqat shaxsiy chatda
   bot.use(async (ctx, next) => {

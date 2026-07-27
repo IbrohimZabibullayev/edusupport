@@ -1,6 +1,7 @@
 import { config } from "./config";
 import { createServer } from "./api/server";
 import { bot } from "./bot/bot";
+import { startDeadlineReminderJob } from "./jobs/deadlineReminder";
 import { startWeeklyReportJob } from "./jobs/weeklyReport";
 import {
   ensureDefaultModules,
@@ -23,6 +24,7 @@ async function main(): Promise<void> {
   });
 
   startWeeklyReportJob(bot);
+  startDeadlineReminderJob(bot);
 
   bot
     .start({
