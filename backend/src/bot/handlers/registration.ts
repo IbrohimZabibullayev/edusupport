@@ -58,8 +58,14 @@ export async function handleStart(ctx: MyContext): Promise<void> {
       break;
     case "APPROVED":
       await ctx.reply(
-        `Assalomu alaykum, ${escapeHtml(op.fullName)}!\nYangi so'rov kiritish uchun quyidagi tugmani bosing.`,
-        { reply_markup: mainMenu }
+        [
+          `Assalomu alaykum, ${escapeHtml(op.fullName)}!`,
+          "",
+          "📩 <b>Eng tez yo'l:</b> mijozning xabarini shu yerga forward qiling — bot turi va modulini so'rab, o'zi dasturchilar guruhiga jo'natadi.",
+          "",
+          "To'liq shakl kerak bo'lsa pastdagi tugmadan foydalaning.",
+        ].join("\n"),
+        { parse_mode: "HTML", reply_markup: mainMenu }
       );
       break;
   }

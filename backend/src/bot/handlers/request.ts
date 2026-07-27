@@ -8,10 +8,12 @@ import {
   mainMenu,
   submitKeyboard,
 } from "../keyboards";
+import { extractMedia } from "../services/content";
+import { createRequestFromDraft } from "../services/createRequest";
 import { getActiveModules, moduleLabel } from "../services/modules";
 import { getActiveSystems } from "../services/systems";
 import { getActiveRequestTypes, requestTypeLabel, requestTypeLabelByKey } from "../services/requestTypes";
-import { notifyAdmins, routeRequest } from "../services/notify";
+import { notifyAdmins } from "../services/notify";
 import { BTN_BACK, BTN_CANCEL, BTN_SUBMIT } from "../texts";
 import { MyContext } from "../types";
 import { requireApprovedOperator } from "./registration";
@@ -154,37 +156,13 @@ export async function handleDescMedia(ctx: MyContext): Promise<void> {
   const msg = ctx.message;
   if (!msg) return;
 
-  let kind = "";
-  let fileId = "";
-  if (msg.photo?.length) {
-    kind = "photo";
-    fileId = msg.photo[msg.photo.length - 1].file_id;
-  } else if (msg.video) {
-    kind = "video";
-    fileId = msg.video.file_id;
-  } else if (msg.voice) {
-    kind = "voice";
-    fileId = msg.voice.file_id;
-  } else if (msg.audio) {
-    kind = "audio";
-    fileId = msg.audio.file_id;
-  } else if (msg.video_note) {
-    kind = "video_note";
-    fileId = msg.video_note.file_id;
-  } else if (msg.animation) {
-    kind = "animation";
-    fileId = msg.animation.file_id;
-  } else if (msg.document) {
-    kind = "document";
-    fileId = msg.document.file_id;
-  } else {
-    return;
-  }
+  const media = extractMedia(msg);
+  if (!media) return;
 
   const draft = ctx.session.draft ?? {};
   draft.attachments = [
     ...(draft.attachments ?? []),
-    { kind, fileId, caption: msg.caption, chatId: msg.chat.id, messageId: msg.message_id },
+    { ...media, caption: msg.caption, chatId: msg.chat.id, messageId: msg.message_id },
   ];
   ctx.session.draft = draft;
   await ctx.reply(`✅ Fayl qabul qilindi (${collectedCount(ctx)}-xabar). ${ACK_HINT}`);
@@ -209,23 +187,7 @@ async function submitRequest(ctx: MyContext): Promise<void> {
     return;
   }
 
-  const captions = attachments.filter((a) => a.caption).map((a) => a.caption as string);
-  const description = [...texts, ...captions].join("\n\n") || "(matnsiz — media biriktirilgan)";
-
-  const request = await prisma.request.create({
-    data: {
-      type: draft.type,
-      systemId: draft.systemId ?? null,
-      moduleId: draft.moduleId,
-      schoolId: draft.schoolId,
-      operatorId: op.id,
-      description,
-      attachments: {
-        create: attachments.map((a) => ({ kind: a.kind, fileId: a.fileId, caption: a.caption ?? null })),
-      },
-    },
-    include: { school: true, module: true },
-  });
+  const request = await createRequestFromDraft(ctx.api, op, draft);
 
   ctx.session.step = "idle";
   ctx.session.draft = undefined;
@@ -241,11 +203,5 @@ async function submitRequest(ctx: MyContext): Promise<void> {
       ...(attachments.length > 0 ? [`📎 Biriktirilgan fayllar: ${attachments.length} ta`] : []),
     ].join("\n"),
     { parse_mode: "HTML", reply_markup: mainMenu }
-  );
-
-  await routeRequest(
-    ctx.api,
-    request.id,
-    attachments.map((a) => ({ chatId: a.chatId, messageId: a.messageId }))
   );
 }

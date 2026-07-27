@@ -7,6 +7,15 @@ Ta'lim ERP kompaniyasi uchun support-tracking tizimi:
 
 Operatorlar bot orqali so'rov (bug / muammo-savol / taklif) kiritadi, buglar dev guruhga avtomatik yo'naltiriladi, admin panelda statistika ko'rinadi.
 
+**So'rov kiritishning ikki yo'li bor:**
+
+| | Qadamlar | Qachon |
+|---|---|---|
+| 📩 **Forward** | mijoz xabarini botga forward qilish → tur → modul → maktab | kundalik ish (eng tez) |
+| ➕ **To'liq shakl** | `/new` → tizim → tur → modul → maktab → izoh → jo'natish | so'rovni o'zingiz yozganda |
+
+Forward yo'lida operator hech narsa ko'chirib yozmaydi: mijozning xabari (matn, rasm, video, fayl) o'zi tavsifga aylanadi, bir nechta xabarni ketma-ket forward qilsa hammasi bitta so'rovga yig'iladi. Tizim operatorning oxirgi so'rovidan olinadi (birinchi ekrandagi tugma bilan almashtiriladi), maktab esa oxirgi ishlatilgan 6 tasi tugma bo'lib chiqadi.
+
 Bundan tashqari operatorlar **Support log** yuritadi — dasturchisiz o'zi (mijoz bilan meet qilib) hal qilgan muammolarni yozib boradi. Bu guruhga yuborilmaydi, faqat hisob-kitob uchun: qaysi modulda qancha muammo, qancha vaqt ketgani, takroriyligi va kim ishlagani. Bot menyusidagi «📋 Support log» tugmasi yoki `/log` orqali kiritiladi, admin panelda jadval + statistika ko'rinadi.
 
 ---
@@ -19,9 +28,12 @@ Bundan tashqari operatorlar **Support log** yuritadi — dasturchisiz o'zi (mijo
 4. Ixtiyoriy: `/setcommands` orqali buyruqlarni qo'shing:
    ```
    start - Ishni boshlash / ro'yxatdan o'tish
-   new - Yangi so'rov kiritish
+   new - Yangi so'rov kiritish (to'liq shakl)
+   log - Support log yozish
    report - Hisobot olish (admin)
    ```
+
+> Forward yo'li shaxsiy chatda ishlaydi — unga BotFather'dagi privacy sozlamasi ta'sir qilmaydi. Privacy faqat **guruhda** muhim (pastdagi bo'limlar bo'yicha bo'limga qarang).
 
 ## 2. Dev guruhni ulash
 

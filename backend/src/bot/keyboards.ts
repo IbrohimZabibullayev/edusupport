@@ -63,6 +63,46 @@ export const submitKeyboard = new Keyboard()
   .text(BTN_CANCEL)
   .resized();
 
+/* Forward oqimi — inline tugmalar (klaviatura ochilmaydi, xabar ustida turadi) */
+
+export const FWD_CANCEL = "❌ Bekor qilish";
+
+/** So'rov turi + tizimni almashtirish qatori */
+export function fwdTypeKeyboard(types: { key: string; name: string; emoji: string }[], canSwitchSystem: boolean): InlineKeyboard {
+  const kb = new InlineKeyboard();
+  for (const t of types) kb.text(requestTypeLabel(t), `fwd:type:${t.key}`).row();
+  if (canSwitchSystem) kb.text("🖥 Tizimni almashtirish", "fwd:sysmenu").row();
+  return kb.text(FWD_CANCEL, "fwd:cancel");
+}
+
+export function fwdSystemKeyboard(systems: { id: number; name: string }[]): InlineKeyboard {
+  const kb = new InlineKeyboard();
+  for (const s of systems) kb.text(s.name, `fwd:sys:${s.id}`).row();
+  return kb.text(FWD_CANCEL, "fwd:cancel");
+}
+
+/** Modul tugmalari 2 ustunda */
+export function fwdModuleKeyboard(modules: { id: number; name: string; emoji: string }[]): InlineKeyboard {
+  const kb = new InlineKeyboard();
+  for (let i = 0; i < modules.length; i += 2) {
+    kb.text(moduleLabel(modules[i]), `fwd:mod:${modules[i].id}`);
+    if (modules[i + 1]) kb.text(moduleLabel(modules[i + 1]), `fwd:mod:${modules[i + 1].id}`);
+    kb.row();
+  }
+  return kb.text(FWD_CANCEL, "fwd:cancel");
+}
+
+/** Operator oxirgi ishlatgan maktablar 2 ustunda + qo'lda yozish */
+export function fwdSchoolKeyboard(schools: { id: number; name: string }[]): InlineKeyboard {
+  const kb = new InlineKeyboard();
+  for (let i = 0; i < schools.length; i += 2) {
+    kb.text(schools[i].name, `fwd:school:${schools[i].id}`);
+    if (schools[i + 1]) kb.text(schools[i + 1].name, `fwd:school:${schools[i + 1].id}`);
+    kb.row();
+  }
+  return kb.text("✏️ Boshqa nom yozish", "fwd:schoolnew").row().text(FWD_CANCEL, "fwd:cancel");
+}
+
 export function approvalKeyboard(operatorId: number): InlineKeyboard {
   return new InlineKeyboard()
     .text("✅ Tasdiqlash", `op_approve:${operatorId}`)

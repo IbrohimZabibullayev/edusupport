@@ -5,6 +5,19 @@ import { SETTING_BACKLOG_CHAT, SETTING_DEV_GROUP, setSetting } from "../settings
 import { ticketId } from "../util";
 import { cmdAdmin, cmdReport, handleAdminLogin, handleAdminPassword } from "./handlers/admin";
 import {
+  cancelForward,
+  handleForward,
+  handleFwdModule,
+  handleFwdSchool,
+  handleFwdSchoolNew,
+  handleFwdSchoolText,
+  handleFwdSystem,
+  handleFwdSystemMenu,
+  handleFwdType,
+  inForwardFlow,
+  isForwarded,
+} from "./handlers/forward";
+import {
   getOperator,
   handleApproveCallback,
   handleContact,
@@ -317,6 +330,17 @@ function createBot(): Bot<MyContext> {
     })
   );
 
+  // Mijoz xabari forward qilinsa — eng qisqa yo'l: forward → tur → modul → maktab.
+  // /new wizardining izoh bosqichida (req_desc) forward eski tartibda biriktirma bo'lib qoladi.
+  bot.on("message", async (ctx, next) => {
+    const step = ctx.session.step;
+    if (isForwarded(ctx.message) && (step === "idle" || inForwardFlow(step))) {
+      await handleForward(ctx);
+      return;
+    }
+    await next();
+  });
+
   // Buyruqlar
   bot.command("start", handleStart);
   bot.command("new", startWizard);
@@ -328,6 +352,15 @@ function createBot(): Bot<MyContext> {
   bot.callbackQuery(/^op_(approve|reject):(\d+)$/, (ctx) =>
     handleApproveCallback(ctx, Number(ctx.match[2]), ctx.match[1] === "approve")
   );
+
+  // Forward oqimining tugmalari
+  bot.callbackQuery("fwd:cancel", cancelForward);
+  bot.callbackQuery("fwd:sysmenu", handleFwdSystemMenu);
+  bot.callbackQuery("fwd:schoolnew", handleFwdSchoolNew);
+  bot.callbackQuery(/^fwd:sys:(\d+)$/, (ctx) => handleFwdSystem(ctx, Number(ctx.match[1])));
+  bot.callbackQuery(/^fwd:type:(.+)$/, (ctx) => handleFwdType(ctx, ctx.match[1]));
+  bot.callbackQuery(/^fwd:mod:(\d+)$/, (ctx) => handleFwdModule(ctx, Number(ctx.match[1])));
+  bot.callbackQuery(/^fwd:school:(\d+)$/, (ctx) => handleFwdSchool(ctx, Number(ctx.match[1])));
   // Eski xabarlardagi boshqa inline tugmalar
   bot.on("callback_query:data", (ctx) => ctx.answerCallbackQuery({ text: "Bu tugma eskirgan" }));
 
@@ -370,6 +403,8 @@ function createBot(): Bot<MyContext> {
         return handleSchoolStep(ctx, text);
       case "req_desc":
         return handleDescStep(ctx, text);
+      case "fwd_school_text":
+        return handleFwdSchoolText(ctx, text);
       case "log_system":
         return handleLogSystem(ctx, text);
       case "log_school":
@@ -391,7 +426,13 @@ function createBot(): Bot<MyContext> {
         if (!op) {
           await ctx.reply("Ro'yxatdan o'tish uchun /start buyrug'ini yuboring.");
         } else if (op.status === "APPROVED") {
-          await ctx.reply(`So'rov kiritish uchun "${BTN_NEW_REQUEST}", o'zingiz hal qilgan muammoni yozish uchun "${BTN_SUPPORT_LOG}" tugmasini bosing.`);
+          await ctx.reply(
+            [
+              "📩 Mijozning xabarini shu yerga forward qilsangiz — so'rov o'zi shakllanadi (eng tez yo'l).",
+              "",
+              `To'liq shakl uchun "${BTN_NEW_REQUEST}", o'zingiz hal qilgan muammoni yozish uchun "${BTN_SUPPORT_LOG}" tugmasini bosing.`,
+            ].join("\n")
+          );
         } else if (op.status === "PENDING") {
           await ctx.reply("⏳ So'rovingiz hali tasdiqlanmagan. Iltimos, kuting.");
         } else {

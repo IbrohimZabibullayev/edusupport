@@ -9,6 +9,10 @@ export type Step =
   | "req_module"
   | "req_school"
   | "req_desc"
+  | "fwd_type"
+  | "fwd_module"
+  | "fwd_school"
+  | "fwd_school_text"
   | "log_system"
   | "log_school"
   | "log_module"
@@ -34,6 +38,8 @@ export interface RequestDraft {
   schoolId?: number;
   descTexts?: string[];
   attachments?: DraftAttachment[];
+  /** Forward oqimi: bot so'ragan xabar — yangi forward kelganda shu xabar tahrirlanadi */
+  promptMessageId?: number;
 }
 
 export interface SupportLogDraft {
