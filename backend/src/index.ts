@@ -4,6 +4,8 @@ import { bot } from "./bot/bot";
 import { startDeadlineReminderJob } from "./jobs/deadlineReminder";
 import { startWeeklyReportJob } from "./jobs/weeklyReport";
 import {
+  backfillSchoolKeys,
+  ensureDefaultGuessKeywords,
   ensureDefaultModules,
   ensureDefaultPriorities,
   ensureDefaultRequestTypes,
@@ -17,6 +19,8 @@ async function main(): Promise<void> {
   await ensureDefaultRequestTypes();
   await ensureDefaultTopicKeywords();
   await ensureDefaultPriorities();
+  await ensureDefaultGuessKeywords();
+  await backfillSchoolKeys();
 
   const app = createServer();
   app.listen(config.port, () => {

@@ -173,3 +173,6 @@ export interface School {
   logsCount: number;
   createdAt: string;
 }
+
+/** O'xshash nomli maktablar guruhi (birlashtirish taklifi) */
+export type DuplicateSchool = Pick<School, "id" | "name" | "requestsCount" | "logsCount">;

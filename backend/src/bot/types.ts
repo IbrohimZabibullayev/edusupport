@@ -13,6 +13,8 @@ export type Step =
   | "fwd_module"
   | "fwd_school"
   | "fwd_school_text"
+  | "fwd_school_confirm"
+  | "fix_school_text"
   | "log_system"
   | "log_school"
   | "log_module"
@@ -40,6 +42,12 @@ export interface RequestDraft {
   attachments?: DraftAttachment[];
   /** Forward oqimi: bot so'ragan xabar — yangi forward kelganda shu xabar tahrirlanadi */
   promptMessageId?: number;
+  /** Xabar kimdan forward qilingani — maktabni eslab qolish uchun */
+  clientKey?: string;
+  clientLabel?: string;
+  /** Maktab nomi yozilib, o'xshashi topilganda tasdiqlash uchun */
+  pendingSchoolName?: string;
+  similarSchoolIds?: number[];
 }
 
 export interface SupportLogDraft {
@@ -58,6 +66,8 @@ export interface SessionData {
   draft?: RequestDraft;
   logDraft?: SupportLogDraft;
   adminLogin?: string;
+  /** "✏️ Tuzatish" oqimida maktab nomi yozilayotgan so'rov */
+  fixRequestId?: number;
 }
 
 export type MyContext = Context & SessionFlavor<SessionData>;

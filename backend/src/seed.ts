@@ -1,4 +1,5 @@
 import { prisma } from "./db";
+import { normalizeSchool } from "./bot/services/schools";
 
 const DEFAULT_MODULES = [
   { name: "Moliya (to'lovlar)", emoji: "💰" },
@@ -74,6 +75,69 @@ export async function ensureDefaultTopicKeywords(): Promise<void> {
   if (count > 0) return;
   await prisma.topicKeyword.createMany({ data: DEFAULT_TOPIC_KEYWORDS });
   console.log(`✅ ${DEFAULT_TOPIC_KEYWORDS.length} ta standart bo'lim kalit so'zi qo'shildi`);
+}
+
+/** Mijoz matnidan so'rov turini taxmin qilish uchun kalit so'zlar */
+const DEFAULT_TYPE_GUESSES: Record<string, string[]> = {
+  BUG: [
+    "bug", "xato", "xatolik", "ishlamayapti", "ishlamadi", "ochilmayapti",
+    "chiqmayapti", "yuklanmayapti", "ketmayapti", "error", "баг", "ошибка", "не работает",
+  ],
+  ISSUE: [
+    "savol", "muammo", "qanday", "nima uchun", "tushunmadim", "yordam bering",
+    "aniqlash", "савол", "муаммо", "вопрос",
+  ],
+  SUGGESTION: [
+    "taklif", "feature", "goya", "qoshsak", "qoshib bering", "bolsa yaxshi",
+    "kerak edi", "iltimos qoshing", "таклиф", "фича", "предложение",
+  ],
+};
+
+/** Modul nomi → matndan tanib olish uchun kalit so'zlar */
+const DEFAULT_MODULE_GUESSES: Record<string, string[]> = {
+  "Moliya (to'lovlar)": ["tolov", "tolovlar", "pul", "chek", "kassa", "qarz", "hisob raqam", "toladi", "оплата"],
+  "Lidlar (CRM)": ["lid", "lidlar", "crm", "лид"],
+  "Dars jadvali": ["jadval", "dars jadvali", "raspisaniya", "расписание"],
+  "Jurnal (davomat/baho)": ["davomat", "baho", "jurnal", "yoqlama", "posesheniya", "оценка"],
+  Topshiriqlar: ["topshiriq", "vazifa", "uy ishi", "задание"],
+  "O'quv bo'limi": ["oquv bolimi", "oquv qismi"],
+  "Imtihonlar / Blok Test": ["imtihon", "blok test", "test", "экзамен"],
+  "Analitika / Dashboard": ["analitika", "dashboard", "statistika", "hisobot", "отчет"],
+  "Gamifikatsiya / Xulq-atvor": ["gamifikatsiya", "ball", "reyting", "xulq", "medal", "рейтинг"],
+  Ombor: ["ombor", "shop", "mahsulot", "buyurtma", "sklad", "склад", "магазин"],
+  Chat: ["chat", "yozishma", "переписка"],
+  "Boshqaruv / Sozlamalar": ["sozlama", "sozlamalar", "boshqaruv", "rol", "huquq", "настройки"],
+  "Kirish / akkaunt": ["kirish", "parol", "login", "akkaunt", "kira olmayapti", "пароль", "вход"],
+};
+
+/** Taxmin kalit so'zlari bo'sh bo'lsa standart qiymatlarni qo'shadi */
+export async function ensureDefaultGuessKeywords(): Promise<void> {
+  const count = await prisma.guessKeyword.count();
+  if (count > 0) return;
+
+  const rows: { kind: string; target: string; keyword: string }[] = [];
+  for (const [type, words] of Object.entries(DEFAULT_TYPE_GUESSES)) {
+    if (!(await prisma.requestType.findUnique({ where: { key: type } }))) continue;
+    for (const keyword of words) rows.push({ kind: "TYPE", target: type, keyword });
+  }
+  const modules = await prisma.module.findMany();
+  for (const [name, words] of Object.entries(DEFAULT_MODULE_GUESSES)) {
+    const mod = modules.find((m) => m.name === name);
+    if (!mod) continue;
+    for (const keyword of words) rows.push({ kind: "MODULE", target: String(mod.id), keyword });
+  }
+  if (rows.length === 0) return;
+  await prisma.guessKeyword.createMany({ data: rows, skipDuplicates: true });
+  console.log(`✅ ${rows.length} ta taxmin kalit so'zi qo'shildi`);
+}
+
+/** Mavjud maktablarga normalizatsiya kalitini yozib chiqadi (bir marta) */
+export async function backfillSchoolKeys(): Promise<void> {
+  const rows = await prisma.school.findMany({ where: { nameKey: null } });
+  for (const s of rows) {
+    await prisma.school.update({ where: { id: s.id }, data: { nameKey: normalizeSchool(s.name) } });
+  }
+  if (rows.length > 0) console.log(`✅ ${rows.length} ta maktab nomi normalizatsiya qilindi`);
 }
 
 const DEFAULT_PRIORITIES = [

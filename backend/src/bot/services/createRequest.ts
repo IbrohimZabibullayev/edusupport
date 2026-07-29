@@ -18,6 +18,7 @@ export async function createRequestFromDraft(api: Api, op: Operator, draft: Requ
       moduleId: draft.moduleId as number,
       schoolId: draft.schoolId as number,
       operatorId: op.id,
+      clientKey: draft.clientKey ?? null,
       description: draftDescription(draft.descTexts ?? [], attachments),
       attachments: {
         create: attachments.map((a) => ({ kind: a.kind, fileId: a.fileId, caption: a.caption ?? null })),

@@ -11,10 +11,58 @@ Operatorlar bot orqali so'rov (bug / muammo-savol / taklif) kiritadi, buglar dev
 
 | | Qadamlar | Qachon |
 |---|---|---|
-| 📩 **Forward** | mijoz xabarini botga forward qilish → tur → modul → maktab | kundalik ish (eng tez) |
+| 📩 **Forward** | mijoz xabarini botga forward qilish — tamom | kundalik ish |
 | ➕ **To'liq shakl** | `/new` → tizim → tur → modul → maktab → izoh → jo'natish | so'rovni o'zingiz yozganda |
 
-Forward yo'lida operator hech narsa ko'chirib yozmaydi: mijozning xabari (matn, rasm, video, fayl) o'zi tavsifga aylanadi, bir nechta xabarni ketma-ket forward qilsa hammasi bitta so'rovga yig'iladi. Tizim operatorning oxirgi so'rovidan olinadi (birinchi ekrandagi tugma bilan almashtiriladi), maktab esa oxirgi ishlatilgan 6 tasi tugma bo'lib chiqadi.
+### Forward: bot o'zi to'ldiradi
+
+Operator mijozning xabarini botga forward qiladi — boshqa hech narsa qilmaydi. Bot uch narsani o'zi aniqlaydi:
+
+| Maydon | Qayerdan |
+|---|---|
+| 🏫 **Maktab** | **shu mijozdan avval kelgan xabardan.** Birinchi marta so'raydi, keyin hech qachon so'ramaydi |
+| 💡 **So'rov turi** | hashtagdan (`#taklif`, `#bug`) yoki matndagi so'zdan («ishlamayapti» → Bug) |
+| 🧩 **Modul** | matndagi so'zdan («chek», «davomat», «shop») yoki modul nomidan |
+| 🖥 **Tizim** | operatorning oxirgi so'rovidan |
+
+Hammasi aniqlansa so'rov **hech narsa so'ralmasdan** guruhga ketadi, operatorga esa qisqa tasdiq keladi:
+
+```
+✅ ES-0021 guruhga yuborildi
+💡 Taklif · 🏆 Gamifikatsiya
+🏫 Najot Ta'lim
+[ ✏️ Tuzatish ]
+```
+
+Xato bo'lsa «✏️ Tuzatish» bosiladi — tur/modul/maktab almashtiriladi, **guruhdagi karta ham darhol yangilanadi** va tuzatish o'sha mijozning xotirasiga yoziladi (keyingi safar to'g'ri taxmin qilinadi).
+
+Aniqlab bo'lmagan maydon bo'lsa faqat **o'shanisi** so'raladi. Yangi mijoz uchun bu odatda bitta savol — maktab.
+
+Bir nechta xabarni ketma-ket forward qilsa (albom ham) hammasi bitta so'rovga yig'iladi.
+
+> Taxmin kalit so'zlari `GuessKeyword` jadvalida — birinchi ishga tushishda ~100 tasi avtomatik qo'shiladi (o'zbekcha, kirill va ruscha variantlar bilan).
+
+### Maktab dublikatlari
+
+Bir maktab har xil yozilib ketmasligi uchun nom **normalizatsiya qilib** taqqoslanadi:
+
+| Yozilishi | Taqqoslash kaliti |
+|---|---|
+| `Najot Ta'lim` · `najot talim` · `NAJOT TAʼLIM` · `Najot  Ta'lim` | `najot talim` |
+
+Apostrofning hamma varianti (`'` `'` `ʻ` `` ` ``) va ortiqcha probellar hisobga olinmaydi, katta-kichik harf farqi yo'q. Kalit mos kelsa — mavjud maktabga bog'lanadi, yangi yozuv ochilmaydi.
+
+Imlo xatosi bo'lsa (`Najot Talimm`) bot **so'raydi**, o'zi qaror qilmaydi:
+
+```
+Siz yozdingiz: Najot Talimm
+Bazada shunga o'xshash maktablar bor. Qaysi biri?
+[ ✅ Najot Ta'lim ]
+[ ✅ Najot ]
+[ ➕ Yangi maktab: Najot Talimm ]
+```
+
+**Mavjud dublikatlar** admin paneldagi «Maktablar» sahifasida ko'rsatiladi: o'xshash nomlar guruhlanadi, qaysi nom qolishini tanlab «Birlashtirish» bosiladi. So'rovlar, support loglar va mijoz xotirasi saqlanadigan nomga ko'chiriladi — **tarix yo'qolmaydi**.
 
 Bundan tashqari operatorlar **Support log** yuritadi — dasturchisiz o'zi (mijoz bilan meet qilib) hal qilgan muammolarni yozib boradi. Bu guruhga yuborilmaydi, faqat hisob-kitob uchun: qaysi modulda qancha muammo, qancha vaqt ketgani, takroriyligi va kim ishlagani. Bot menyusidagi «📋 Support log» tugmasi yoki `/log` orqali kiritiladi, admin panelda jadval + statistika ko'rinadi.
 

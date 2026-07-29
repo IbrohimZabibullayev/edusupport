@@ -14,9 +14,23 @@ import {
   handleFwdSystem,
   handleFwdSystemMenu,
   handleFwdType,
+  handleSchoolNewAnyway,
+  handleSchoolSame,
   inForwardFlow,
   isForwarded,
 } from "./handlers/forward";
+import {
+  handleFixClose,
+  handleFixMenu,
+  handleFixModuleMenu,
+  handleFixModuleSet,
+  handleFixSchoolInput,
+  handleFixSchoolMenu,
+  handleFixSchoolSet,
+  handleFixSchoolText,
+  handleFixTypeMenu,
+  handleFixTypeSet,
+} from "./handlers/fix";
 import {
   getOperator,
   handleApproveCallback,
@@ -378,10 +392,23 @@ function createBot(): Bot<MyContext> {
   bot.callbackQuery("fwd:cancel", cancelForward);
   bot.callbackQuery("fwd:sysmenu", handleFwdSystemMenu);
   bot.callbackQuery("fwd:schoolnew", handleFwdSchoolNew);
+  bot.callbackQuery(/^fwd:samesch:(\d+)$/, (ctx) => handleSchoolSame(ctx, Number(ctx.match[1])));
+  bot.callbackQuery("fwd:newsch", handleSchoolNewAnyway);
   bot.callbackQuery(/^fwd:sys:(\d+)$/, (ctx) => handleFwdSystem(ctx, Number(ctx.match[1])));
   bot.callbackQuery(/^fwd:type:(.+)$/, (ctx) => handleFwdType(ctx, ctx.match[1]));
   bot.callbackQuery(/^fwd:mod:(\d+)$/, (ctx) => handleFwdModule(ctx, Number(ctx.match[1])));
   bot.callbackQuery(/^fwd:school:(\d+)$/, (ctx) => handleFwdSchool(ctx, Number(ctx.match[1])));
+
+  // Avtomatik yuborilgan so'rovni tuzatish
+  bot.callbackQuery(/^fx:menu:(\d+)$/, (ctx) => handleFixMenu(ctx, Number(ctx.match[1])));
+  bot.callbackQuery(/^fx:close:(\d+)$/, (ctx) => handleFixClose(ctx, Number(ctx.match[1])));
+  bot.callbackQuery(/^fx:type:(\d+)$/, (ctx) => handleFixTypeMenu(ctx, Number(ctx.match[1])));
+  bot.callbackQuery(/^fx:typeset:(\d+):(.+)$/, (ctx) => handleFixTypeSet(ctx, Number(ctx.match[1]), ctx.match[2]));
+  bot.callbackQuery(/^fx:mod:(\d+)$/, (ctx) => handleFixModuleMenu(ctx, Number(ctx.match[1])));
+  bot.callbackQuery(/^fx:modset:(\d+):(\d+)$/, (ctx) => handleFixModuleSet(ctx, Number(ctx.match[1]), Number(ctx.match[2])));
+  bot.callbackQuery(/^fx:sch:(\d+)$/, (ctx) => handleFixSchoolMenu(ctx, Number(ctx.match[1])));
+  bot.callbackQuery(/^fx:schset:(\d+):(\d+)$/, (ctx) => handleFixSchoolSet(ctx, Number(ctx.match[1]), Number(ctx.match[2])));
+  bot.callbackQuery(/^fx:schtext:(\d+)$/, (ctx) => handleFixSchoolText(ctx, Number(ctx.match[1])));
   // Eski xabarlardagi boshqa inline tugmalar
   bot.on("callback_query:data", (ctx) => ctx.answerCallbackQuery({ text: "Bu tugma eskirgan" }));
 
@@ -426,6 +453,8 @@ function createBot(): Bot<MyContext> {
         return handleDescStep(ctx, text);
       case "fwd_school_text":
         return handleFwdSchoolText(ctx, text);
+      case "fix_school_text":
+        return handleFixSchoolInput(ctx, text);
       case "log_system":
         return handleLogSystem(ctx, text);
       case "log_school":

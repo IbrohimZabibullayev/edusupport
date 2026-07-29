@@ -1,8 +1,62 @@
 import { Router } from "express";
 import { prisma } from "../../db";
+import { duplicateGroups, normalizeSchool } from "../../bot/services/schools";
 import { wrap } from "../middleware/wrap";
 
 export const schoolsRouter = Router();
+
+/** O'xshash nomli maktablar guruhlari — birlashtirish taklifi uchun */
+schoolsRouter.get("/duplicates", wrap(async (_req, res) => {
+  const schools = await prisma.school.findMany({
+    include: { _count: { select: { requests: true, supportLogs: true } } },
+  });
+  const groups = duplicateGroups(schools).map((g) =>
+    g
+      .map((s) => {
+        const full = schools.find((x) => x.id === s.id)!;
+        return {
+          id: s.id,
+          name: s.name,
+          requestsCount: full._count.requests,
+          logsCount: full._count.supportLogs,
+        };
+      })
+      // Ko'p ma'lumotga ega yozuv birinchi — odatda shunisi saqlanadi
+      .sort((a, b) => b.requestsCount + b.logsCount - (a.requestsCount + a.logsCount))
+  );
+  res.json(groups);
+}));
+
+/** Dublikatlarni birlashtiradi: hamma so'rov/log/mijoz xotirasi targetId ga ko'chiriladi */
+schoolsRouter.post("/merge", wrap(async (req, res) => {
+  const targetId = Number(req.body?.targetId);
+  const sourceIds = Array.isArray(req.body?.sourceIds) ? req.body.sourceIds.map(Number) : [];
+  const sources = sourceIds.filter((id: number) => Number.isInteger(id) && id !== targetId);
+
+  if (!Number.isInteger(targetId) || sources.length === 0) {
+    res.status(400).json({ error: "Noto'g'ri so'rov" });
+    return;
+  }
+  const target = await prisma.school.findUnique({ where: { id: targetId } });
+  if (!target) {
+    res.status(404).json({ error: "Asosiy maktab topilmadi" });
+    return;
+  }
+
+  const [requests, logs] = await Promise.all([
+    prisma.request.count({ where: { schoolId: { in: sources } } }),
+    prisma.supportLog.count({ where: { schoolId: { in: sources } } }),
+  ]);
+
+  await prisma.$transaction([
+    prisma.request.updateMany({ where: { schoolId: { in: sources } }, data: { schoolId: targetId } }),
+    prisma.supportLog.updateMany({ where: { schoolId: { in: sources } }, data: { schoolId: targetId } }),
+    prisma.clientSource.updateMany({ where: { schoolId: { in: sources } }, data: { schoolId: targetId } }),
+    prisma.school.deleteMany({ where: { id: { in: sources } } }),
+  ]);
+
+  res.json({ ok: true, merged: sources.length, movedRequests: requests, movedLogs: logs });
+}));
 
 schoolsRouter.get("/", wrap(async (_req, res) => {
   const schools = await prisma.school.findMany({
@@ -33,7 +87,7 @@ schoolsRouter.post("/", wrap(async (req, res) => {
     res.status(409).json({ error: "Bu nomdagi maktab allaqachon mavjud" });
     return;
   }
-  const school = await prisma.school.create({ data: { name } });
+  const school = await prisma.school.create({ data: { name, nameKey: normalizeSchool(name) } });
   res.status(201).json({ id: school.id, name: school.name, requestsCount: 0, createdAt: school.createdAt });
 }));
 
@@ -52,7 +106,7 @@ schoolsRouter.patch("/:id", wrap(async (req, res) => {
     return;
   }
   try {
-    const school = await prisma.school.update({ where: { id }, data: { name } });
+    const school = await prisma.school.update({ where: { id }, data: { name, nameKey: normalizeSchool(name) } });
     res.json({ id: school.id, name: school.name });
   } catch {
     res.status(404).json({ error: "Maktab topilmadi" });

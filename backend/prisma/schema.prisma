@@ -100,11 +100,49 @@ model Operator {
 model School {
   id                  Int       @id @default(autoincrement())
   name                String    @unique
+  /** Normalizatsiya qilingan nom — dublikatni topish uchun ("Najot Ta'lim" → "najot talim") */
+  nameKey             String?
   createdByOperatorId Int?
   createdBy           Operator? @relation("SchoolCreator", fields: [createdByOperatorId], references: [id])
   createdAt           DateTime  @default(now())
   requests            Request[]
   supportLogs         SupportLog[]
+  clientSources       ClientSource[]
+
+  @@index([nameKey])
+}
+
+/**
+ * Mijoz chati → maktab xotirasi. Operator kimdandir xabar forward qilganda
+ * o'sha odam qaysi maktabdan ekani eslab qolinadi va keyingi safar so'ralmaydi.
+ */
+model ClientSource {
+  id           Int      @id @default(autoincrement())
+  /** "u:<telegram user id>", "c:<chat id>" yoki "h:<yashirin nom>" */
+  key          String   @unique
+  label        String
+  schoolId     Int
+  school       School   @relation(fields: [schoolId], references: [id])
+  /** Oxirgi so'rov turi/moduli — matndan taxmin qilib bo'lmaganda ishlatiladi */
+  lastTypeKey  String?
+  lastModuleId Int?
+  useCount     Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+/**
+ * Mijoz matnidan so'rov turi yoki modulni taxmin qilish uchun kalit so'zlar.
+ * kind="TYPE" → target = RequestType.key; kind="MODULE" → target = Module.id
+ */
+model GuessKeyword {
+  id      Int    @id @default(autoincrement())
+  kind    String
+  target  String
+  keyword String
+
+  @@unique([kind, target, keyword])
+  @@index([kind])
 }
 
 model Request {
@@ -126,6 +164,8 @@ model Request {
   cardMessageId Int?
   createdAt    DateTime    @default(now())
   attachments  RequestAttachment[]
+  /** Forward orqali kelgan bo'lsa — mijoz chatining kaliti (ClientSource.key) */
+  clientKey    String?
 
   // Kim bajarildi deb belgilagani (guruhdagi tugma orqali — operator bo'lishi shart emas)
   doneByTgId   String?
