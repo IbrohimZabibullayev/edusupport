@@ -18,6 +18,7 @@ import {
   handleSchoolSame,
   inForwardFlow,
   isForwarded,
+  remindToUseButtons,
 } from "./handlers/forward";
 import {
   handleFixClose,
@@ -460,8 +461,15 @@ function createBot(): Bot<MyContext> {
         return handleSchoolStep(ctx, text);
       case "req_desc":
         return handleDescStep(ctx, text);
+      // Maktab bosqichlarining hammasida yozilgan matn nom deb qabul qilinadi —
+      // operator tugmani bosish o'rniga yozsa qoralama yo'qolmasin
+      case "fwd_school":
       case "fwd_school_text":
+      case "fwd_school_confirm":
         return handleFwdSchoolText(ctx, text);
+      case "fwd_type":
+      case "fwd_module":
+        return remindToUseButtons(ctx);
       case "fix_school_text":
         return handleFixSchoolInput(ctx, text);
       case "school_confirm":

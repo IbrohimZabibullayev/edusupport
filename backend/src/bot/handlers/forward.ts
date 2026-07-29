@@ -174,7 +174,15 @@ async function askSchool(ctx: MyContext, draft: RequestDraft): Promise<void> {
     return;
   }
   ctx.session.step = "fwd_school";
-  await showPrompt(ctx, draft, "Qaysi maktab?", fwdSchoolKeyboard(recent));
+  await showPrompt(ctx, draft, "Qaysi maktab?\n<i>Ro'yxatda bo'lmasa — nomini shunchaki yozing.</i>", fwdSchoolKeyboard(recent));
+}
+
+/**
+ * Tugma kutilayotgan bosqichda matn yozilsa — qoralamani yo'qotmaymiz,
+ * shunchaki tugmani bosish kerakligini aytamiz.
+ */
+export async function remindToUseButtons(ctx: MyContext): Promise<void> {
+  await ctx.reply("Yuqoridagi xabardagi tugmalardan birini tanlang.");
 }
 
 /** Operator oxirgi so'rovlarida ishlatgan maktablar (takrorlanmas, eng ko'pi 6 ta) */
