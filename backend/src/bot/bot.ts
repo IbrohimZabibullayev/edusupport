@@ -113,6 +113,29 @@ function createBot(): Bot<MyContext> {
     await next();
   });
 
+  // Guruh superguruhga aylantirilganda (masalan bo'limlar yoqilganda) Telegram
+  // chat ID sini butunlay o'zgartiradi va eski ID "chat not found" bera boshlaydi.
+  // Telegram bir marta yuboradigan migrate_to_chat_id ni tutib, bazani yangilaymiz.
+  bot.use(async (ctx, next) => {
+    const to = ctx.message?.migrate_to_chat_id;
+    if (to && ctx.chat) {
+      const oldId = String(ctx.chat.id);
+      const newId = String(to);
+      try {
+        await Promise.all([
+          prisma.setting.updateMany({ where: { value: oldId }, data: { value: newId } }),
+          prisma.system.updateMany({ where: { groupChatId: oldId }, data: { groupChatId: newId } }),
+          prisma.groupTopic.updateMany({ where: { chatId: oldId }, data: { chatId: newId } }),
+          prisma.request.updateMany({ where: { cardChatId: oldId }, data: { cardChatId: newId } }),
+        ]);
+        console.log(`Guruh superguruhga aylandi: ${oldId} → ${newId}, sozlamalar yangilandi`);
+      } catch (err) {
+        console.error("Guruh ID sini yangilab bo'lmadi:", err);
+      }
+    }
+    await next();
+  });
+
   // Guruhda ham ishlaydi — DEV_GROUP_ID ni topish uchun qulay
   bot.command("chatid", (ctx) => {
     const threadId = threadOf(ctx.message);

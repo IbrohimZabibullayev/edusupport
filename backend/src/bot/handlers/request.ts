@@ -9,10 +9,12 @@ import {
 import { extractMedia } from "../services/content";
 import { createRequestFromDraft } from "../services/createRequest";
 import { getActiveModules, moduleLabel } from "../services/modules";
+import { deliveryLine } from "../services/notify";
 import { getActiveSystems } from "../services/systems";
 import { getActiveRequestTypes, requestTypeLabel, requestTypeLabelByKey } from "../services/requestTypes";
 import { BTN_BACK, BTN_CANCEL, BTN_SUBMIT } from "../texts";
 import { MyContext } from "../types";
+
 import { requireApprovedOperator } from "./registration";
 import { resolveSchoolOrAsk } from "./schoolPick";
 
@@ -168,7 +170,7 @@ async function submitRequest(ctx: MyContext): Promise<void> {
   const typeLabel = await requestTypeLabelByKey(request.type);
   await ctx.reply(
     [
-      `✅ So'rov qabul qilindi! Ticket: <code>${ticketId(request.ticketNumber)}</code>`,
+      deliveryLine(request.ticketNumber, request.delivery),
       "",
       `Turi: ${escapeHtml(typeLabel)}`,
       `Modul: ${escapeHtml(moduleLabel(request.module))}`,

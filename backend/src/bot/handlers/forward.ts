@@ -8,7 +8,7 @@ import { draftDescription, extractMedia } from "../services/content";
 import { createRequestFromDraft } from "../services/createRequest";
 import { guessFromText } from "../services/guess";
 import { getActiveModules, moduleLabel } from "../services/modules";
-import { notifyAdmins } from "../services/notify";
+import { deliveryLine, notifyAdmins } from "../services/notify";
 import { getActiveRequestTypes, requestTypeLabelByKey } from "../services/requestTypes";
 import { createSchool, matchSchool } from "../services/schools";
 import { getActiveSystems } from "../services/systems";
@@ -413,7 +413,7 @@ async function submitForward(ctx: MyContext, draft: RequestDraft): Promise<void>
   ctx.session.draft = undefined;
 
   const lines = [
-    `✅ <b>${ticketId(request.ticketNumber)}</b> guruhga yuborildi`,
+    deliveryLine(request.ticketNumber, request.delivery),
     "",
     `${escapeHtml(await requestTypeLabelByKey(request.type))} · ${escapeHtml(moduleLabel(request.module))}`,
     `🏫 ${escapeHtml(request.school.name)}`,

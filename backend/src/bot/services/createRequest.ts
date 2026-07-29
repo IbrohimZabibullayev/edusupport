@@ -8,6 +8,9 @@ import { routeRequest } from "./notify";
 /**
  * Qoralamadan so'rov yaratadi va guruhga yo'naltiradi.
  * /new wizard ham, forward oqimi ham shu funksiyadan foydalanadi.
+ *
+ * Qaytadigan `delivery` — so'rov haqiqatan qayerga tushgani. Operatorga
+ * "guruhga yuborildi" deb aytishdan oldin shuni tekshirish kerak.
  */
 export async function createRequestFromDraft(api: Api, op: Operator, draft: RequestDraft) {
   const attachments = draft.attachments ?? [];
@@ -27,11 +30,11 @@ export async function createRequestFromDraft(api: Api, op: Operator, draft: Requ
     include: { school: true, module: true, system: true },
   });
 
-  await routeRequest(
+  const delivery = await routeRequest(
     api,
     request.id,
     attachments.map((a) => ({ chatId: a.chatId, messageId: a.messageId }))
   );
 
-  return request;
+  return { ...request, delivery };
 }
