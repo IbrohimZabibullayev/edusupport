@@ -46,6 +46,8 @@ export interface RequestDraft {
   /** Xabar kimdan forward qilingani — maktabni eslab qolish uchun */
   clientKey?: string;
   clientLabel?: string;
+  /** Oxirgi xabar qo'shilgan payt — tashlab ketilgan qoralamani ajratish uchun */
+  lastAt?: number;
   /** Maktab nomi yozilib, o'xshashi topilganda tasdiqlash uchun */
   pendingSchoolName?: string;
   similarSchoolIds?: number[];

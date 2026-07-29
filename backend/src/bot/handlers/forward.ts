@@ -18,6 +18,13 @@ import { requireApprovedOperator } from "./registration";
 /** Forward oqimining bosqichlari — shu holatlarda kelgan yangi forward mavjud qoralamaga qo'shiladi */
 const FWD_STEPS: Step[] = ["fwd_type", "fwd_module", "fwd_school", "fwd_school_text", "fwd_school_confirm"];
 
+/**
+ * Shuncha vaqtdan keyin qoralama "tashlab ketilgan" hisoblanadi va yangi forward
+ * unga qo'shilmay, yangi so'rov boshlaydi. Albom/ketma-ket xabarlar soniyalar
+ * ichida keladi, shuning uchun bu chegara ularga xalaqit qilmaydi.
+ */
+const DRAFT_TTL_MS = 5 * 60_000;
+
 export function isForwarded(msg: Message): boolean {
   return msg.forward_origin !== undefined;
 }
@@ -59,18 +66,20 @@ export async function handleForward(ctx: MyContext): Promise<void> {
   const msg = ctx.message;
   if (!msg) return;
 
-  // Ketma-ket kelgan forwardlar (albom yoki bir necha xabar) — bitta qoralamaga
-  if (inForwardFlow(ctx.session.step) && ctx.session.draft) {
-    const draft = ctx.session.draft;
-    if (!collect(draft, msg)) return;
-    ctx.session.draft = draft;
-    if (ctx.session.step === "fwd_type" && draft.promptMessageId) {
-      await editTypePrompt(ctx, draft, msg.chat.id);
-    }
+  // Ketma-ket kelgan forwardlar (albom yoki bir necha xabar) bitta so'rovga yig'iladi.
+  // Lekin bu faqat "hozir yig'ilayotgan" qoralama uchun — yarim tashlab ketilgan
+  // eski qoralama yangi murojaatni yutib yubormasligi kerak.
+  const current = ctx.session.draft;
+  if (inForwardFlow(ctx.session.step) && current && Date.now() - (current.lastAt ?? 0) < DRAFT_TTL_MS) {
+    if (!collect(current, msg)) return;
+    current.lastAt = Date.now();
+    ctx.session.draft = current;
+    // Qabul qilinganini ko'rsatish uchun joriy savolni qayta chizamiz
+    await continueFlow(ctx, current);
     return;
   }
 
-  const draft: RequestDraft = {};
+  const draft: RequestDraft = { lastAt: Date.now() };
   if (!collect(draft, msg)) {
     await ctx.reply("Bu turdagi xabarni qabul qila olmayman. Matn, rasm, video yoki fayl yuboring.");
     return;
@@ -119,11 +128,16 @@ export async function continueFlow(ctx: MyContext, draft: RequestDraft): Promise
 
 /* ---------- So'rov turi ---------- */
 
+/** Har savolning tepasida turadigan sarlavha — yangi forward qo'shilgani shundan bilinadi */
+function promptHeader(draft: RequestDraft): string {
+  return `📥 <b>Mijoz xabari qabul qilindi</b> (${collectedCount(draft)} ta)`;
+}
+
 async function typePromptText(draft: RequestDraft): Promise<string> {
   const systems = await getActiveSystems();
   const system = systems.find((s) => s.id === draft.systemId);
   return [
-    `📥 <b>Mijoz xabari qabul qilindi</b> (${collectedCount(draft)} ta)`,
+    promptHeader(draft),
     `🖥 Tizim: ${system ? escapeHtml(system.name) : "belgilanmagan"}`,
     "",
     "So'rov turini tanlang:",
@@ -145,22 +159,16 @@ async function askType(ctx: MyContext, draft: RequestDraft): Promise<void> {
   ctx.session.draft = draft;
 }
 
-async function editTypePrompt(ctx: MyContext, draft: RequestDraft, chatId: number): Promise<void> {
-  try {
-    await ctx.api.editMessageText(chatId, draft.promptMessageId!, await typePromptText(draft), {
-      parse_mode: "HTML",
-      reply_markup: fwdTypeKeyboard(await getActiveRequestTypes(), (await getActiveSystems()).length > 0),
-    });
-  } catch {
-    // xabar o'zgarmagan bo'lishi mumkin
-  }
-}
-
 /* ---------- Modul ---------- */
 
 async function askModule(ctx: MyContext, draft: RequestDraft): Promise<void> {
   ctx.session.step = "fwd_module";
-  await showPrompt(ctx, draft, "Qaysi modulga tegishli?", fwdModuleKeyboard(await getActiveModules()));
+  await showPrompt(
+    ctx,
+    draft,
+    `${promptHeader(draft)}\n\nQaysi modulga tegishli?`,
+    fwdModuleKeyboard(await getActiveModules())
+  );
 }
 
 /* ---------- Maktab ---------- */
@@ -170,11 +178,16 @@ async function askSchool(ctx: MyContext, draft: RequestDraft): Promise<void> {
   const recent = op ? await recentSchools(op.id) : [];
   if (recent.length === 0) {
     ctx.session.step = "fwd_school_text";
-    await showPrompt(ctx, draft, "Maktab/muassasa nomini yozing:");
+    await showPrompt(ctx, draft, `${promptHeader(draft)}\n\nMaktab/muassasa nomini yozing:`);
     return;
   }
   ctx.session.step = "fwd_school";
-  await showPrompt(ctx, draft, "Qaysi maktab?\n<i>Ro'yxatda bo'lmasa — nomini shunchaki yozing.</i>", fwdSchoolKeyboard(recent));
+  await showPrompt(
+    ctx,
+    draft,
+    `${promptHeader(draft)}\n\nQaysi maktab?\n<i>Ro'yxatda bo'lmasa — nomini shunchaki yozing.</i>`,
+    fwdSchoolKeyboard(recent)
+  );
 }
 
 /**
