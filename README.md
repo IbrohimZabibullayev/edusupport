@@ -52,6 +52,8 @@ Bir maktab har xil yozilib ketmasligi uchun nom **normalizatsiya qilib** taqqosl
 
 Apostrofning hamma varianti (`'` `'` `ʻ` `` ` ``) va ortiqcha probellar hisobga olinmaydi, katta-kichik harf farqi yo'q. Kalit mos kelsa — mavjud maktabga bog'lanadi, yangi yozuv ochilmaydi.
 
+Bu tekshiruv **maktab nomi yoziladigan uchala joyda** bir xil ishlaydi: forward oqimida, `/new` to'liq shaklida va **Support log**da (`handlers/schoolPick.ts` — umumiy bosqich).
+
 Imlo xatosi bo'lsa (`Najot Talimm`) bot **so'raydi**, o'zi qaror qilmaydi:
 
 ```

@@ -12,13 +12,14 @@ import { getActiveModules, moduleLabel } from "../services/modules";
 import { notifyAdmins } from "../services/notify";
 import { getActivePriorities } from "../services/priorities";
 import { getActiveSystems } from "../services/systems";
-import { BTN_BACK, BTN_CANCEL, BTN_NO, BTN_YES } from "../texts";
+import { ASK_LOG_MODULE as ASK_MODULE, BTN_BACK, BTN_CANCEL, BTN_NO, BTN_YES } from "../texts";
 import { MyContext } from "../types";
 import { requireApprovedOperator } from "./registration";
+import { resolveSchoolOrAsk } from "./schoolPick";
 
 const ASK_SYSTEM = "Support log — qaysi tizim bo'yicha? Tanlang:";
 const ASK_SCHOOL = "Mijoz (maktab/muassasa) nomini yozing:";
-const ASK_MODULE = "Muammo qaysi modulda edi?";
+
 const ASK_PROBLEM = "Muammoni qisqacha yozing (erkin matn):";
 const ASK_PRIORITY = "Muammoning darajasi (prioriteti)?";
 const ASK_TIME = [
@@ -71,25 +72,8 @@ export async function handleLogSchool(ctx: MyContext, text: string): Promise<voi
       return;
     }
   }
-  if (text.length < 3) {
-    await ctx.reply("Maktab nomi juda qisqa — kamida 3 harf yozing.");
-    return;
-  }
-  const op = await requireApprovedOperator(ctx);
-  if (!op) return;
-
-  let school = await prisma.school.findFirst({ where: { name: { equals: text, mode: "insensitive" } } });
-  if (!school) {
-    school = await prisma.school.create({ data: { name: text, createdByOperatorId: op.id } });
-    await notifyAdmins(
-      ctx.api,
-      `🏫 <b>Yangi maktab qo'shildi:</b> ${escapeHtml(school.name)}\n👤 Operator: ${escapeHtml(op.fullName)}`
-    );
-  }
-
-  ctx.session.logDraft = { ...ctx.session.logDraft, schoolId: school.id };
-  ctx.session.step = "log_module";
-  await ctx.reply(ASK_MODULE, { reply_markup: buildModuleKeyboard(await getActiveModules()) });
+  // Dublikat himoyasi umumiy bosqichda — oqim shu yerdan davom etadi
+  await resolveSchoolOrAsk(ctx, text, "log");
 }
 
 export async function handleLogModule(ctx: MyContext, text: string): Promise<void> {

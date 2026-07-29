@@ -1,4 +1,3 @@
-import { prisma } from "../../db";
 import { escapeHtml, ticketId } from "../../util";
 import {
   backCancelKeyboard,
@@ -6,28 +5,21 @@ import {
   buildSystemKeyboard,
   buildTypeKeyboard,
   mainMenu,
-  submitKeyboard,
 } from "../keyboards";
 import { extractMedia } from "../services/content";
 import { createRequestFromDraft } from "../services/createRequest";
 import { getActiveModules, moduleLabel } from "../services/modules";
 import { getActiveSystems } from "../services/systems";
 import { getActiveRequestTypes, requestTypeLabel, requestTypeLabelByKey } from "../services/requestTypes";
-import { notifyAdmins } from "../services/notify";
 import { BTN_BACK, BTN_CANCEL, BTN_SUBMIT } from "../texts";
 import { MyContext } from "../types";
 import { requireApprovedOperator } from "./registration";
+import { resolveSchoolOrAsk } from "./schoolPick";
 
 const ASK_SYSTEM = "Qaysi tizim bo'yicha so'rov? Tanlang:";
 const ASK_TYPE = "So'rov turini tanlang:";
 const ASK_MODULE = "Qaysi modulga tegishli?";
 const ASK_SCHOOL = "Maktab/muassasa nomini yozing:";
-const ASK_DESC = [
-  "Endi izoh yuboring.",
-  "",
-  "Matn, rasm, video, fayl yoki ovozli xabar — bir nechta xabar yuborishingiz mumkin.",
-  `Hammasini yuborib bo'lgach, pastdagi "${BTN_SUBMIT}" tugmasini bosing.`,
-].join("\n");
 
 export async function startWizard(ctx: MyContext): Promise<void> {
   const op = await requireApprovedOperator(ctx);
@@ -105,27 +97,8 @@ export async function handleSchoolStep(ctx: MyContext, text: string): Promise<vo
     await ctx.reply(ASK_MODULE, { reply_markup: buildModuleKeyboard(await getActiveModules()) });
     return;
   }
-  if (text.length < 3) {
-    await ctx.reply("Maktab nomi juda qisqa — kamida 3 harf yozing.");
-    return;
-  }
-  const op = await requireApprovedOperator(ctx);
-  if (!op) return;
-
-  let school = await prisma.school.findFirst({
-    where: { name: { equals: text, mode: "insensitive" } },
-  });
-  if (!school) {
-    school = await prisma.school.create({ data: { name: text, createdByOperatorId: op.id } });
-    await notifyAdmins(
-      ctx.api,
-      `🏫 <b>Yangi maktab qo'shildi:</b> ${escapeHtml(school.name)}\n👤 Operator: ${escapeHtml(op.fullName)}`
-    );
-  }
-
-  ctx.session.draft = { ...ctx.session.draft, schoolId: school.id, descTexts: [], attachments: [] };
-  ctx.session.step = "req_desc";
-  await ctx.reply(ASK_DESC, { reply_markup: submitKeyboard });
+  // Dublikat himoyasi umumiy bosqichda — oqim shu yerdan davom etadi
+  await resolveSchoolOrAsk(ctx, text, "req");
 }
 
 function collectedCount(ctx: MyContext): number {

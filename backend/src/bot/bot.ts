@@ -32,6 +32,11 @@ import {
   handleFixTypeSet,
 } from "./handlers/fix";
 import {
+  handleSchoolConfirmNew,
+  handleSchoolConfirmPick,
+  handleSchoolConfirmText,
+} from "./handlers/schoolPick";
+import {
   getOperator,
   handleApproveCallback,
   handleContact,
@@ -394,6 +399,10 @@ function createBot(): Bot<MyContext> {
   bot.callbackQuery("fwd:schoolnew", handleFwdSchoolNew);
   bot.callbackQuery(/^fwd:samesch:(\d+)$/, (ctx) => handleSchoolSame(ctx, Number(ctx.match[1])));
   bot.callbackQuery("fwd:newsch", handleSchoolNewAnyway);
+
+  // /new va /log wizardlaridagi maktab tasdig'i (dublikat himoyasi)
+  bot.callbackQuery(/^sch:pick:(\d+)$/, (ctx) => handleSchoolConfirmPick(ctx, Number(ctx.match[1])));
+  bot.callbackQuery("sch:new", handleSchoolConfirmNew);
   bot.callbackQuery(/^fwd:sys:(\d+)$/, (ctx) => handleFwdSystem(ctx, Number(ctx.match[1])));
   bot.callbackQuery(/^fwd:type:(.+)$/, (ctx) => handleFwdType(ctx, ctx.match[1]));
   bot.callbackQuery(/^fwd:mod:(\d+)$/, (ctx) => handleFwdModule(ctx, Number(ctx.match[1])));
@@ -455,6 +464,8 @@ function createBot(): Bot<MyContext> {
         return handleFwdSchoolText(ctx, text);
       case "fix_school_text":
         return handleFixSchoolInput(ctx, text);
+      case "school_confirm":
+        return handleSchoolConfirmText(ctx, text);
       case "log_system":
         return handleLogSystem(ctx, text);
       case "log_school":
