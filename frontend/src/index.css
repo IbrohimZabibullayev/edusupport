@@ -1,17 +1,25 @@
 @import "tailwindcss";
 
+/*
+ * Minimalist palitra: sokin, past to'yingan ranglar.
+ * Panel kun bo'yi ochiq turadi — yorqin ko'k/qizil ataylab ishlatilmaydi.
+ *
+ * Grafik ranglari lib/chartColors.ts da va shu yerdagi --color-surface ga
+ * nisbatan validatordan o'tkazilgan. Surface o'zgarsa qayta tekshiring.
+ */
 @theme {
-  --color-page: #f9f9f7;
+  --color-page: #f7f7f5;
   --color-surface: #fcfcfb;
-  --color-ink: #0b0b0b;
-  --color-ink-2: #52514e;
-  --color-muted: #898781;
-  --color-grid: #e1e0d9;
-  --color-line: #c3c2b7;
-  --color-accent: #2a78d6;
-  --color-accent-soft: #cde2fb;
-  --color-danger: #d03b3b;
-  --color-good: #006300;
+  --color-ink: #171716;
+  --color-ink-2: #4e4d49;
+  --color-muted: #7c7b76;
+  /* Hairline chegaralar: grid — ichki ajratgich, line — tashqi kontur */
+  --color-grid: #ebeae5;
+  --color-line: #ddddd6;
+  --color-accent: #2f6a9e;
+  --color-accent-soft: #e9eff4;
+  --color-danger: #a8514c;
+  --color-good: #3f7d5a;
   --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
@@ -19,4 +27,17 @@ body {
   background-color: var(--color-page);
   color: var(--color-ink);
   font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Raqamlar ustunlarda tekis tursin */
+table {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Fokus halqasi — ko'zga tashlanadi, lekin qichqirmaydi */
+:where(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 55%, transparent);
+  outline-offset: 2px;
 }

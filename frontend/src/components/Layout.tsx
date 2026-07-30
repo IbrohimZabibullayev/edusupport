@@ -29,8 +29,8 @@ function Nav({ onNavigate }: { onNavigate?: () => void }) {
           end={item.to === "/"}
           onClick={onNavigate}
           className={({ isActive }) =>
-            `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              isActive ? "bg-accent-soft/60 text-accent" : "text-ink-2 hover:bg-black/5"
+            `flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
+              isActive ? "bg-black/[0.05] font-medium text-ink" : "text-ink-2 hover:bg-black/[0.03]"
             }`
           }
         >
@@ -53,7 +53,7 @@ export default function Layout() {
 
   const brand = (
     <div className="flex items-center gap-2 px-3">
-      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-sm font-bold text-white">E</div>
+      <div className="flex h-8 w-8 items-center justify-center rounded-md bg-ink text-sm font-semibold text-white">E</div>
       <span className="text-base font-semibold tracking-tight">EduSupport</span>
     </div>
   );
@@ -61,34 +61,34 @@ export default function Layout() {
   return (
     <div className="min-h-screen md:flex">
       {/* Sidebar — desktop */}
-      <aside className="fixed inset-y-0 z-20 hidden w-60 flex-col gap-6 border-r border-black/10 bg-surface py-5 md:flex">
+      <aside className="fixed inset-y-0 z-20 hidden w-60 flex-col gap-6 border-r border-grid bg-surface py-5 md:flex">
         {brand}
         <div className="flex-1 px-2">
           <Nav />
         </div>
         <div className="px-2">
-          <button onClick={logout} className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-ink-2 hover:bg-black/5">
+          <button onClick={logout} className="w-full rounded-md px-3 py-2 text-left text-sm text-ink-2 transition-colors hover:bg-black/[0.03]">
             ← Chiqish
           </button>
         </div>
       </aside>
 
       {/* Top bar — mobile */}
-      <header className="sticky top-0 z-20 flex items-center justify-between border-b border-black/10 bg-surface px-4 py-3 md:hidden">
+      <header className="sticky top-0 z-20 flex items-center justify-between border-b border-grid bg-surface px-4 py-3 md:hidden">
         {brand}
         <button
           onClick={() => setMenuOpen((v) => !v)}
           aria-label="Menyu"
-          className="rounded-lg border border-black/10 px-3 py-1.5 text-sm font-medium"
+          className="rounded-md border border-line px-3 py-1.5 text-sm font-medium text-ink-2"
         >
           {menuOpen ? "Yopish" : "Menyu"}
         </button>
       </header>
 
       {menuOpen && (
-        <div className="fixed inset-x-0 top-[57px] z-10 border-b border-black/10 bg-surface p-3 shadow-lg md:hidden">
+        <div className="fixed inset-x-0 top-[57px] z-10 border-b border-grid bg-surface p-3 md:hidden">
           <Nav onNavigate={() => setMenuOpen(false)} />
-          <button onClick={logout} className="mt-2 w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-ink-2 hover:bg-black/5">
+          <button onClick={logout} className="mt-2 w-full rounded-md px-3 py-2 text-left text-sm text-ink-2 transition-colors hover:bg-black/[0.03]">
             ← Chiqish
           </button>
         </div>

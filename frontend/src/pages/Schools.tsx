@@ -43,7 +43,7 @@ function DuplicateMerger({ groups, onMerged }: { groups: DuplicateSchool[][]; on
   };
 
   return (
-    <div className="mb-5 rounded-xl border border-line bg-accent-soft/30 p-4">
+    <div className="mb-5 rounded-md border border-line bg-accent-soft/30 p-4">
       <h2 className="mb-1 text-sm font-semibold">O'xshash nomli maktablar</h2>
       <p className="mb-3 text-xs text-ink-2">
         Quyidagilar bitta maktabning turli yozilishi bo'lishi mumkin. Qaysi nom qolishini tanlang va birlashtiring —
@@ -54,7 +54,7 @@ function DuplicateMerger({ groups, onMerged }: { groups: DuplicateSchool[][]; on
         {groups.map((group, i) => {
           const keep = keepIds[i] ?? group[0].id;
           return (
-            <div key={group.map((s) => s.id).join("-")} className="rounded-lg border border-black/10 bg-surface p-3">
+            <div key={group.map((s) => s.id).join("-")} className="rounded-lg border border-grid bg-surface p-3">
               <div className="mb-2 space-y-1.5">
                 {group.map((s) => (
                   <label key={s.id} className="flex cursor-pointer items-center gap-2 text-sm">
@@ -74,7 +74,7 @@ function DuplicateMerger({ groups, onMerged }: { groups: DuplicateSchool[][]; on
               <button
                 onClick={() => merge(group, i)}
                 disabled={busy === i}
-                className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                className="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
               >
                 {busy === i ? "Birlashtirilmoqda…" : "Birlashtirish"}
               </button>
@@ -159,21 +159,21 @@ export default function Schools() {
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
           placeholder="Yangi maktab nomi…"
-          className="w-72 rounded-lg border border-black/15 bg-white px-3 py-2 text-sm outline-none focus:border-accent"
+          className="w-72 rounded-md border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
         />
         <button
           type="submit"
           disabled={adding || newName.trim().length < 3}
-          className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
         >
           + Qo'shish
         </button>
       </form>
 
-      <div className="overflow-x-auto rounded-xl border border-black/10 bg-surface">
+      <div className="overflow-x-auto rounded-lg border border-grid bg-surface">
         <table className="w-full min-w-[560px] text-sm">
           <thead>
-            <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-muted">
+            <tr className="border-b border-grid text-left text-xs uppercase tracking-wide text-muted">
               <th className="px-4 py-3">Nomi</th>
               <th className="px-4 py-3 text-right">So'rovlar</th>
               <th className="px-4 py-3 text-right">Loglar</th>
@@ -188,14 +188,14 @@ export default function Schools() {
               <tr><td colSpan={5}><EmptyNote text="Maktablar hali qo'shilmagan" /></td></tr>
             ) : (
               schools.map((s) => (
-                <tr key={s.id} className="border-b border-black/5 last:border-0 hover:bg-black/[0.02]">
+                <tr key={s.id} className="border-b border-grid last:border-0 hover:bg-black/[0.02]">
                   <td className="px-4 py-3">
                     {editingId === s.id ? (
                       <input
                         value={editName}
                         onChange={(e) => setEditName(e.target.value)}
                         autoFocus
-                        className="w-64 rounded-lg border border-black/15 bg-white px-2 py-1 text-sm outline-none focus:border-accent"
+                        className="w-64 rounded-md border border-line bg-surface px-2 py-1 text-sm outline-none focus:border-accent"
                       />
                     ) : (
                       <span className="font-medium">{s.name}</span>
@@ -210,13 +210,13 @@ export default function Schools() {
                         <button
                           onClick={() => saveEdit(s.id)}
                           disabled={editName.trim().length < 3}
-                          className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                          className="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
                         >
                           Saqlash
                         </button>
                         <button
                           onClick={() => setEditingId(null)}
-                          className="rounded-lg border border-black/15 px-3 py-1.5 text-xs font-medium text-ink-2"
+                          className="rounded-md border border-line px-3 py-1.5 text-xs font-medium text-ink-2"
                         >
                           Bekor
                         </button>
@@ -225,7 +225,7 @@ export default function Schools() {
                       <span className="flex justify-end gap-2">
                         <button
                           onClick={() => { setEditingId(s.id); setEditName(s.name); }}
-                          className="rounded-lg border border-black/15 px-3 py-1.5 text-xs font-medium text-ink-2"
+                          className="rounded-md border border-line px-3 py-1.5 text-xs font-medium text-ink-2"
                         >
                           Tahrirlash
                         </button>

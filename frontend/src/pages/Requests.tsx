@@ -24,7 +24,7 @@ interface Filters {
 const EMPTY_FILTERS: Filters = { search: "", type: "", done: "", systemId: "", moduleId: "", schoolId: "", operatorId: "", from: "", to: "" };
 
 const selectCls =
-  "rounded-lg border border-black/15 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-accent";
+  "rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm outline-none focus:border-accent";
 
 export default function Requests() {
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
@@ -159,10 +159,10 @@ export default function Requests() {
         )}
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-black/10 bg-surface">
+      <div className="overflow-x-auto rounded-lg border border-grid bg-surface">
         <table className="w-full min-w-[760px] text-sm">
           <thead>
-            <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-muted">
+            <tr className="border-b border-grid text-left text-xs uppercase tracking-wide text-muted">
               <th className="px-4 py-3">Ticket</th>
               <th className="px-4 py-3">Sana</th>
               <th className="px-4 py-3">Holati</th>
@@ -184,7 +184,7 @@ export default function Requests() {
                 <Fragment key={r.id}>
                   <tr
                     onClick={() => setExpandedId(expandedId === r.id ? null : r.id)}
-                    className="cursor-pointer border-b border-black/5 align-top last:border-0 hover:bg-black/[0.02]"
+                    className="cursor-pointer border-b border-grid align-top last:border-0 hover:bg-black/[0.02]"
                   >
                     <td className="px-4 py-3 font-medium tabular-nums">
                       <IconChevron className={`mr-1.5 h-3.5 w-3.5 text-muted transition-transform ${expandedId === r.id ? "rotate-90" : ""}`} />
@@ -196,10 +196,10 @@ export default function Requests() {
                         onClick={() => toggleDone(r.id, !r.done)}
                         disabled={busyId === r.id}
                         title={r.done ? "Qayta ochish uchun bosing" : "Bajarildi deb belgilash uchun bosing"}
-                        className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
+                        className={`inline-flex items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
                           r.done
-                            ? "bg-[#d9f0d9] text-good hover:bg-[#c8e8c8]"
-                            : "border border-black/15 text-ink-2 hover:border-good hover:text-good"
+                            ? "border border-good/30 text-good hover:bg-good/[0.06]"
+                            : "border border-line text-ink-2 hover:border-good hover:text-good"
                         }`}
                       >
                         <IconCheck className="h-3.5 w-3.5" />
@@ -221,7 +221,7 @@ export default function Requests() {
                     </td>
                   </tr>
                   {expandedId === r.id && (
-                    <tr className="border-b border-black/5 bg-black/[0.015]">
+                    <tr className="border-b border-grid bg-black/[0.015]">
                       <td colSpan={9} className="px-6 py-4">
                         {r.done && (
                           <div className="mb-3 inline-flex items-center gap-1.5 text-sm text-good">

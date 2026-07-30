@@ -41,7 +41,7 @@ export default function Operators() {
       <ErrorNote message={error} />
 
       {pending.length > 0 && (
-        <Card className="mb-4 border-[#e8c96a] bg-[#fdf8ea]">
+        <Card className="mb-4 border-[#c9a227]/30 bg-[#c9a227]/[0.05]">
           <h2 className="mb-3 text-sm font-semibold">⏳ Tasdiqlash kutilmoqda ({pending.length})</h2>
           <div className="space-y-2">
             {pending.map((o) => (
@@ -64,7 +64,7 @@ export default function Operators() {
                   <button
                     disabled={busyId === o.id}
                     onClick={() => setStatus(o, "REJECTED")}
-                    className={`${btn} inline-flex items-center gap-1.5 border border-black/15 text-ink-2`}
+                    className={`${btn} inline-flex items-center gap-1.5 border border-line text-ink-2`}
                   >
                     <IconClose className="h-4 w-4" />
                     Rad etish
@@ -76,10 +76,10 @@ export default function Operators() {
         </Card>
       )}
 
-      <div className="overflow-x-auto rounded-xl border border-black/10 bg-surface">
+      <div className="overflow-x-auto rounded-lg border border-grid bg-surface">
         <table className="w-full min-w-[680px] text-sm">
           <thead>
-            <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-muted">
+            <tr className="border-b border-grid text-left text-xs uppercase tracking-wide text-muted">
               <th className="px-4 py-3">Ism</th>
               <th className="px-4 py-3">Telefon</th>
               <th className="px-4 py-3">Username</th>
@@ -96,7 +96,7 @@ export default function Operators() {
               <tr><td colSpan={7}><EmptyNote text="Operatorlar hali yo'q" /></td></tr>
             ) : (
               operators.map((o) => (
-                <tr key={o.id} className="border-b border-black/5 last:border-0 hover:bg-black/[0.02]">
+                <tr key={o.id} className="border-b border-grid last:border-0 hover:bg-black/[0.02]">
                   <td className="px-4 py-3 font-medium">
                     {o.fullName} {o.isAdmin && <span className="ml-1 rounded bg-accent-soft/60 px-1.5 py-0.5 text-xs text-accent">admin</span>}
                   </td>
@@ -119,7 +119,7 @@ export default function Operators() {
                       <button
                         disabled={busyId === o.id}
                         onClick={() => setStatus(o, "APPROVED")}
-                        className={`${btn} border border-black/15 text-ink-2`}
+                        className={`${btn} border border-line text-ink-2`}
                       >
                         Blokdan chiqarish
                       </button>
@@ -128,7 +128,7 @@ export default function Operators() {
                       <button
                         disabled={busyId === o.id}
                         onClick={() => setStatus(o, "APPROVED")}
-                        className={`${btn} border border-black/15 text-ink-2`}
+                        className={`${btn} border border-line text-ink-2`}
                       >
                         Tasdiqlash
                       </button>

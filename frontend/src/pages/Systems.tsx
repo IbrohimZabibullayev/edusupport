@@ -3,7 +3,7 @@ import { EmptyNote, ErrorNote, LoadingNote, PageTitle } from "../components/ui";
 import { api } from "../lib/api";
 import { SystemItem } from "../lib/types";
 
-const btnCls = "rounded-lg border border-black/15 px-2.5 py-1.5 text-xs font-medium text-ink-2 disabled:opacity-40";
+const btnCls = "rounded-md border border-line px-2.5 py-1.5 text-xs font-medium text-ink-2 disabled:opacity-40";
 
 export default function Systems() {
   const [systems, setSystems] = useState<SystemItem[] | null>(null);
@@ -65,21 +65,21 @@ export default function Systems() {
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
           placeholder="Yangi tizim nomi…"
-          className="w-64 rounded-lg border border-black/15 bg-white px-3 py-2 text-sm outline-none focus:border-accent"
+          className="w-64 rounded-md border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
         />
         <button
           type="submit"
           disabled={adding || newName.trim().length < 2}
-          className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
         >
           + Qo'shish
         </button>
       </form>
 
-      <div className="overflow-x-auto rounded-xl border border-black/10 bg-surface">
+      <div className="overflow-x-auto rounded-lg border border-grid bg-surface">
         <table className="w-full min-w-[620px] text-sm">
           <thead>
-            <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-muted">
+            <tr className="border-b border-grid text-left text-xs uppercase tracking-wide text-muted">
               <th className="px-4 py-3">Tizim</th>
               <th className="px-4 py-3">Holati</th>
               <th className="px-4 py-3">Telegram guruh</th>
@@ -94,22 +94,22 @@ export default function Systems() {
               <tr><td colSpan={5}><EmptyNote text="Tizimlar yo'q" /></td></tr>
             ) : (
               systems.map((s) => (
-                <tr key={s.id} className={`border-b border-black/5 last:border-0 ${s.isActive ? "" : "opacity-50"}`}>
+                <tr key={s.id} className={`border-b border-grid last:border-0 ${s.isActive ? "" : "opacity-50"}`}>
                   <td className="px-4 py-3">
                     {editingId === s.id ? (
                       <input
                         value={editName}
                         onChange={(e) => setEditName(e.target.value)}
                         autoFocus
-                        className="w-56 rounded-lg border border-black/15 bg-white px-2 py-1 text-sm outline-none focus:border-accent"
+                        className="w-56 rounded-md border border-line bg-surface px-2 py-1 text-sm outline-none focus:border-accent"
                       />
                     ) : (
                       <span className="font-medium">{s.name}</span>
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                      s.isActive ? "bg-[#d9f0d9] text-good" : "bg-black/5 text-ink-2"
+                    <span className={`inline-block rounded-md px-2 py-0.5 text-xs font-medium ${
+                      s.isActive ? "border border-good/30 text-good" : "border border-grid text-muted"
                     }`}>
                       {s.isActive ? "Faol" : "O'chirilgan"}
                     </span>
@@ -128,7 +128,7 @@ export default function Systems() {
                         <button
                           onClick={async () => { await patch(s.id, { name: editName.trim() }); setEditingId(null); }}
                           disabled={busy || editName.trim().length < 2}
-                          className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                          className="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
                         >
                           Saqlash
                         </button>

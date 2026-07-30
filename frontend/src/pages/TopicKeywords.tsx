@@ -68,7 +68,7 @@ export default function TopicKeywords() {
           {requestTypes.map((type) => {
             const items = rows.filter((r) => r.type === type.key);
             return (
-              <div key={type.key} className="rounded-xl border border-black/10 bg-surface p-5">
+              <div key={type.key} className="rounded-lg border border-grid bg-surface p-5">
                 <div className="mb-3 flex items-center gap-2">
                   <span className="h-3 w-3 rounded-full" style={{ backgroundColor: type.color }} />
                   <h2 className="font-semibold">{type.name}</h2>
@@ -81,7 +81,7 @@ export default function TopicKeywords() {
                     items.map((r) => (
                       <span
                         key={r.id}
-                        className="inline-flex items-center gap-1.5 rounded-full border border-black/10 bg-black/[0.03] py-1 pl-3 pr-1.5 text-sm"
+                        className="inline-flex items-center gap-1.5 rounded-full border border-grid bg-black/[0.03] py-1 pl-3 pr-1.5 text-sm"
                       >
                         {r.keyword}
                         <button
@@ -102,12 +102,12 @@ export default function TopicKeywords() {
                     value={inputs[type.key] ?? ""}
                     onChange={(e) => setInputs((v) => ({ ...v, [type.key]: e.target.value }))}
                     placeholder="Yangi so'z…"
-                    className="w-full rounded-lg border border-black/15 bg-white px-3 py-1.5 text-sm outline-none focus:border-accent"
+                    className="w-full rounded-md border border-line bg-surface px-3 py-1.5 text-sm outline-none focus:border-accent"
                   />
                   <button
                     type="submit"
                     disabled={busy || (inputs[type.key] ?? "").trim().length < 2}
-                    className="shrink-0 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+                    className="shrink-0 rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
                   >
                     +
                   </button>

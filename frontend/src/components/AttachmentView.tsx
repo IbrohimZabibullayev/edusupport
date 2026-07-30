@@ -46,7 +46,7 @@ export function AttachmentView({ attachment }: { attachment: AttachmentInfo }) {
   const label = KIND_LABELS[attachment.kind] ?? attachment.kind;
 
   return (
-    <div className="rounded-lg border border-black/10 bg-surface p-3">
+    <div className="rounded-lg border border-grid bg-surface p-3">
       <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">{label}</div>
       {error ? (
         <p className="text-sm text-danger">Faylni yuklab bo'lmadi (eskirgan bo'lishi mumkin)</p>

@@ -20,7 +20,7 @@ export default function Settings() {
   return (
     <div>
       <h1 className="mb-4 text-xl font-semibold tracking-tight">Sozlamalar</h1>
-      <div className="mb-6 flex flex-wrap gap-1 overflow-x-auto border-b border-black/10">
+      <div className="mb-6 flex flex-wrap gap-1 overflow-x-auto border-b border-grid">
         {TABS.map((t) => (
           <button
             key={t.key}

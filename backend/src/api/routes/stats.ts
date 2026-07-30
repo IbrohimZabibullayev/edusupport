@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { Request as ExpressRequest, Router } from "express";
 import { prisma } from "../../db";
-import { tashkentDayStart, tashkentWeekStart } from "../../util";
+import { tashkentDayStart, tashkentMonthStart, tashkentWeekStart } from "../../util";
 import { wrap } from "../middleware/wrap";
 
 export const statsRouter = Router();
@@ -155,6 +155,176 @@ statsRouter.get("/schools", wrap(async (req, res) => {
       count: g._count._all,
     }))
   );
+}));
+
+/* ---------- Yuklama: davr solishtiruvi (kunlik / haftalik / oylik) ---------- */
+
+type Granularity = "day" | "week" | "month";
+
+/** Bucket chegaralari: joriy davr oxirgi bo'ladi */
+function buildBuckets(g: Granularity, count: number): { start: Date; end: Date; label: string }[] {
+  const now = new Date();
+  const dayFmt = new Intl.DateTimeFormat("uz-UZ", { timeZone: "Asia/Tashkent", day: "2-digit", month: "2-digit" });
+  const monthFmt = new Intl.DateTimeFormat("uz-UZ", { timeZone: "Asia/Tashkent", month: "short", year: "2-digit" });
+
+  const starts: Date[] = [];
+  for (let i = count - 1; i >= 0; i--) {
+    if (g === "day") starts.push(tashkentDayStart(now, i));
+    else if (g === "week") starts.push(tashkentWeekStart(now, i));
+    else starts.push(tashkentMonthStart(now, i));
+  }
+  return starts.map((start, i) => {
+    const next = starts[i + 1];
+    let end: Date;
+    if (next) end = next;
+    else if (g === "day") end = new Date(tashkentDayStart(now, -1).getTime());
+    else if (g === "week") end = new Date(tashkentWeekStart(now, -1).getTime());
+    else end = tashkentMonthStart(now, -1);
+    return { start, end, label: g === "month" ? monthFmt.format(start) : dayFmt.format(start) };
+  });
+}
+
+const BUCKET_COUNT: Record<Granularity, number> = { day: 14, week: 12, month: 12 };
+
+interface Totals {
+  requests: number;
+  logs: number;
+  minutes: number;
+  recurring: number;
+  activeDays: number;
+}
+
+const emptyTotals = (): Totals => ({ requests: 0, logs: 0, minutes: 0, recurring: 0, activeDays: 0 });
+
+/**
+ * Kunlik / haftalik / oylik ko'rsatkichlar bir joyda:
+ * joriy davr, oldingi davr (solishtirish uchun), tarixiy qator va operator kesimi.
+ *
+ * "Ishlagan kun" — operator hech bo'lmasa bitta yozuv kiritgan kun (Asia/Tashkent).
+ * Kunlik o'rtacha shunga bo'linadi: dam olgan kunlar ko'rsatkichni pasaytirmasin.
+ */
+statsRouter.get("/workload", wrap(async (req, res) => {
+  const g: Granularity =
+    req.query.granularity === "week" || req.query.granularity === "month"
+      ? (req.query.granularity as Granularity)
+      : "day";
+
+  const buckets = buildBuckets(g, BUCKET_COUNT[g]);
+  const windowStart = buckets[0].start;
+  const current = buckets[buckets.length - 1];
+  const previous = buckets[buckets.length - 2];
+
+  const [operators, requests, logs] = await Promise.all([
+    prisma.operator.findMany({
+      where: { status: "APPROVED" },
+      select: { id: true, fullName: true, username: true },
+    }),
+    prisma.request.findMany({
+      where: { createdAt: { gte: windowStart } },
+      select: { operatorId: true, createdAt: true },
+    }),
+    prisma.supportLog.findMany({
+      where: { createdAt: { gte: windowStart } },
+      select: { operatorId: true, createdAt: true, resolveMinutes: true, recurring: true },
+    }),
+  ]);
+
+  const bucketOf = (at: Date) => {
+    for (let i = buckets.length - 1; i >= 0; i--) {
+      if (at >= buckets[i].start && at < buckets[i].end) return i;
+    }
+    return -1;
+  };
+
+  const series = buckets.map((b) => ({ label: b.label, requests: 0, logs: 0, minutes: 0 }));
+  const inPeriod = (i: number, at: Date) => at >= buckets[i].start && at < buckets[i].end;
+
+  // Operator kesimi: joriy va oldingi davr alohida
+  const perOperator = new Map<number, { cur: Totals; prev: Totals; curDays: Set<number>; name: string; username: string | null }>();
+  const ensure = (id: number) => {
+    if (!perOperator.has(id)) {
+      const o = operators.find((x) => x.id === id);
+      perOperator.set(id, {
+        cur: emptyTotals(),
+        prev: emptyTotals(),
+        curDays: new Set(),
+        name: o?.fullName ?? `#${id}`,
+        username: o?.username ?? null,
+      });
+    }
+    return perOperator.get(id)!;
+  };
+  for (const o of operators) ensure(o.id);
+
+  for (const r of requests) {
+    const i = bucketOf(r.createdAt);
+    if (i >= 0) series[i].requests++;
+    const s = ensure(r.operatorId);
+    if (previous && inPeriod(buckets.length - 2, r.createdAt)) s.prev.requests++;
+    if (inPeriod(buckets.length - 1, r.createdAt)) {
+      s.cur.requests++;
+      s.curDays.add(tashkentDayStart(r.createdAt).getTime());
+    }
+  }
+  for (const l of logs) {
+    const i = bucketOf(l.createdAt);
+    if (i >= 0) {
+      series[i].logs++;
+      series[i].minutes += l.resolveMinutes;
+    }
+    const s = ensure(l.operatorId);
+    if (previous && inPeriod(buckets.length - 2, l.createdAt)) {
+      s.prev.logs++;
+      s.prev.minutes += l.resolveMinutes;
+    }
+    if (inPeriod(buckets.length - 1, l.createdAt)) {
+      s.cur.logs++;
+      s.cur.minutes += l.resolveMinutes;
+      if (l.recurring) s.cur.recurring++;
+      s.curDays.add(tashkentDayStart(l.createdAt).getTime());
+    }
+  }
+
+  const sumOf = (i: number): Totals => ({
+    requests: series[i]?.requests ?? 0,
+    logs: series[i]?.logs ?? 0,
+    minutes: series[i]?.minutes ?? 0,
+    recurring: 0,
+    activeDays: 0,
+  });
+
+  const curTotals = sumOf(buckets.length - 1);
+  const prevTotals = sumOf(buckets.length - 2);
+  // Jamoa bo'yicha ishlagan kunlar — operatorlarnikining birlashmasi emas, kunlar soni
+  const allCurDays = new Set<number>();
+  for (const s of perOperator.values()) for (const d of s.curDays) allCurDays.add(d);
+  curTotals.activeDays = allCurDays.size;
+
+  res.json({
+    granularity: g,
+    currentLabel: current.label,
+    previousLabel: previous?.label ?? null,
+    current: curTotals,
+    previous: prevTotals,
+    series,
+    operators: [...perOperator.entries()]
+      .map(([id, s]) => ({
+        id,
+        fullName: s.name,
+        username: s.username,
+        requests: s.cur.requests,
+        logs: s.cur.logs,
+        minutes: s.cur.minutes,
+        recurring: s.cur.recurring,
+        activeDays: s.curDays.size,
+        avgMinutesPerDay: s.curDays.size > 0 ? Math.round(s.cur.minutes / s.curDays.size) : 0,
+        avgLogMinutes: s.cur.logs > 0 ? Math.round(s.cur.minutes / s.cur.logs) : 0,
+        prevRequests: s.prev.requests,
+        prevLogs: s.prev.logs,
+        prevMinutes: s.prev.minutes,
+      }))
+      .sort((a, b) => b.requests + b.logs - (a.requests + a.logs) || b.minutes - a.minutes),
+  });
 }));
 
 statsRouter.get("/operators", wrap(async (req, res) => {

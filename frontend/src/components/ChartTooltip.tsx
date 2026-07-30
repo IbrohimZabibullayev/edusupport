@@ -16,7 +16,7 @@ export function ChartTooltip({
 }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-lg border border-black/10 bg-surface px-3 py-2 text-sm shadow-md">
+    <div className="rounded-lg border border-grid bg-surface px-3 py-2 text-sm shadow-md">
       {label && <div className="mb-1 text-xs text-muted">{label}</div>}
       {payload.map((entry, i) => (
         <div key={i} className="flex items-center gap-2">

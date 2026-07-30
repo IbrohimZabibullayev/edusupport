@@ -176,3 +176,41 @@ export interface School {
 
 /** O'xshash nomli maktablar guruhi (birlashtirish taklifi) */
 export type DuplicateSchool = Pick<School, "id" | "name" | "requestsCount" | "logsCount">;
+
+export type WorkloadGranularity = "day" | "week" | "month";
+
+export interface WorkloadTotals {
+  requests: number;
+  logs: number;
+  minutes: number;
+  recurring: number;
+  activeDays: number;
+}
+
+/** Operator kesimidagi yuklama — joriy davr + oldingi davr (solishtirish uchun) */
+export interface OperatorWorkload {
+  id: number;
+  fullName: string;
+  username: string | null;
+  requests: number;
+  logs: number;
+  minutes: number;
+  recurring: number;
+  /** Operator hech bo'lmasa bitta yozuv kiritgan kunlar soni */
+  activeDays: number;
+  avgMinutesPerDay: number;
+  avgLogMinutes: number;
+  prevRequests: number;
+  prevLogs: number;
+  prevMinutes: number;
+}
+
+export interface WorkloadResponse {
+  granularity: WorkloadGranularity;
+  currentLabel: string;
+  previousLabel: string | null;
+  current: WorkloadTotals;
+  previous: WorkloadTotals;
+  series: { label: string; requests: number; logs: number; minutes: number }[];
+  operators: OperatorWorkload[];
+}

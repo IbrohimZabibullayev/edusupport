@@ -20,7 +20,7 @@ interface Filters {
 
 const EMPTY: Filters = { search: "", systemId: "", moduleId: "", operatorId: "", priorityId: "", recurring: "", from: "", to: "" };
 
-const selectCls = "rounded-lg border border-black/15 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-accent";
+const selectCls = "rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm outline-none focus:border-accent";
 
 export default function SupportLog() {
   const [filters, setFilters] = useState<Filters>(EMPTY);
@@ -133,10 +133,10 @@ export default function SupportLog() {
         )}
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-black/10 bg-surface">
+      <div className="overflow-x-auto rounded-lg border border-grid bg-surface">
         <table className="w-full min-w-[900px] text-sm">
           <thead>
-            <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-muted">
+            <tr className="border-b border-grid text-left text-xs uppercase tracking-wide text-muted">
               <th className="px-3 py-3">Sana</th>
               <th className="px-3 py-3">Tizim</th>
               <th className="px-3 py-3">Mijoz</th>
@@ -155,7 +155,7 @@ export default function SupportLog() {
               <tr><td colSpan={9}><EmptyNote text="Loglar topilmadi" /></td></tr>
             ) : (
               data.items.map((l) => (
-                <tr key={l.id} className="border-b border-black/5 align-top last:border-0 hover:bg-black/[0.02]">
+                <tr key={l.id} className="border-b border-grid align-top last:border-0 hover:bg-black/[0.02]">
                   <td className="whitespace-nowrap px-3 py-3 tabular-nums text-ink-2">{formatDate(l.createdAt)}</td>
                   <td className="whitespace-nowrap px-3 py-3">{l.system ?? "—"}</td>
                   <td className="px-3 py-3">{l.school}</td>
@@ -174,7 +174,7 @@ export default function SupportLog() {
                   <td className="whitespace-nowrap px-3 py-3 tabular-nums">{formatMinutes(l.resolveMinutes)}</td>
                   <td className="px-3 py-3">
                     {l.recurring ? (
-                      <span className="rounded-full bg-[#fdf0cc] px-2 py-0.5 text-xs font-medium text-[#6b4d00]">Ha</span>
+                      <span className="rounded-md border border-[#c9a227]/35 px-2 py-0.5 text-xs font-medium text-[#8a6d14]">Ha</span>
                     ) : (
                       <span className="text-muted">Yo'q</span>
                     )}

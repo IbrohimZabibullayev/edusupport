@@ -40,10 +40,13 @@ export async function ensureDefaultSystems(): Promise<void> {
   console.log(`✅ ${DEFAULT_SYSTEMS.length} ta tizim bazaga qo'shildi`);
 }
 
+// Ranglar dataviz validatoridan o'tgan sokin palitradan (chroma, CVD ajralishi,
+// oq fonga kontrast). Yashil emas ko'kish-yashil: yashil terrakota bilan
+// protanopiyada qo'shilib ketadi.
 const DEFAULT_REQUEST_TYPES = [
-  { key: "BUG", name: "Bug", emoji: "🐞", color: "#2a78d6", sortOrder: 1 },
-  { key: "ISSUE", name: "Muammo-savol", emoji: "❓", color: "#eb6834", sortOrder: 2 },
-  { key: "SUGGESTION", name: "Taklif", emoji: "💡", color: "#1baf7a", sortOrder: 3 },
+  { key: "BUG", name: "Bug", emoji: "🐞", color: "#2f6a9e", sortOrder: 1 },
+  { key: "ISSUE", name: "Muammo-savol", emoji: "❓", color: "#b86a3c", sortOrder: 2 },
+  { key: "SUGGESTION", name: "Taklif", emoji: "💡", color: "#2e9e86", sortOrder: 3 },
 ];
 
 /** So'rov turlari jadvali bo'sh bo'lsa standart 3 turni qo'shadi (migratsiya seed'i uchun zaxira) */
