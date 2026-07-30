@@ -115,61 +115,96 @@ export async function handleClaim(ctx: MyContext, id: number): Promise<void> {
   await refreshCard(ctx.api, id);
 }
 
-/** Guruh adminlaridan mas'ul tanlash ro'yxati (Bot API oddiy a'zolarni bermaydi) */
-export async function handleAssignMenu(ctx: MyContext, id: number): Promise<void> {
+/**
+ * Telegram Bot API guruhning oddiy a'zolarini ro'yxatlab bermaydi, shuning uchun
+ * ro'yxat tuzmaymiz: tugmani bosgan odamdan mas'ulni o'zi tag qilishini so'raymiz.
+ * Javob shu xabarga reply bo'lib keladi va undagi mention o'qiladi.
+ */
+const ASSIGN_PROMPT_MARK = "kimga berasiz";
+
+export async function handleAssignAsk(ctx: MyContext, id: number): Promise<void> {
   const r = await load(ctx, id);
-  if (!r || !ctx.chat) return;
-  let admins;
-  try {
-    admins = await ctx.api.getChatAdministrators(ctx.chat.id);
-  } catch {
-    await ctx.answerCallbackQuery({ text: "Ro'yxatni ololmadim — bot guruhda admin bo'lishi kerak", show_alert: true });
-    return;
-  }
-  const people = admins.filter((a) => !a.user.is_bot);
-  if (people.length === 0) {
-    await ctx.answerCallbackQuery({
-      text: "Guruhda admin topilmadi. \"Men olaman\" tugmasidan foydalaning.",
-      show_alert: true,
-    });
-    return;
-  }
-  const kb = new InlineKeyboard();
-  for (let i = 0; i < people.length; i += 2) {
-    const name = (u: (typeof people)[number]) => [u.user.first_name, u.user.last_name].filter(Boolean).join(" ");
-    kb.text(name(people[i]), `rq:asg:${id}:${people[i].user.id}`);
-    if (people[i + 1]) kb.text(name(people[i + 1]), `rq:asg:${id}:${people[i + 1].user.id}`);
-    kb.row();
-  }
-  kb.text("⬅️ Orqaga", `rq:back:${id}`);
+  if (!r) return;
+  const by = pressedBy(ctx);
   await ctx.answerCallbackQuery();
-  await ctx.editMessageReplyMarkup({ reply_markup: kb });
+
+  const who = by.username
+    ? `@${escapeHtml(by.username)}`
+    : `<a href="tg://user?id=${by.tgId}">${escapeHtml(by.name)}</a>`;
+  await noteOnCard(
+    ctx,
+    r,
+    [
+      `👤 <b>${ticketId(r.ticketNumber)}</b> — ${who}, ${ASSIGN_PROMPT_MARK}?`,
+      "",
+      "<i>Shu xabarga reply qilib mas'ul xodimni tag qiling (masalan @username).</i>",
+    ].join("\n")
+  );
 }
 
-export async function handleAssignPick(ctx: MyContext, id: number, tgId: number): Promise<void> {
-  const r = await load(ctx, id);
-  if (!r || !ctx.chat) return;
-  const admins = await ctx.api.getChatAdministrators(ctx.chat.id).catch(() => []);
-  const picked = admins.find((a) => a.user.id === tgId);
-  if (!picked) {
-    await ctx.answerCallbackQuery({ text: "Bu odam topilmadi", show_alert: true });
-    return;
+/** Reply xabaridagi birinchi mention — @username yoki usernamesiz odam */
+function readMention(msg: {
+  text?: string;
+  entities?: { type: string; offset: number; length: number; user?: { id: number; first_name: string; last_name?: string; username?: string } }[];
+}): { tgId: string | null; name: string; username: string | null } | null {
+  const text = msg.text ?? "";
+  for (const e of msg.entities ?? []) {
+    if (e.type === "text_mention" && e.user) {
+      return {
+        tgId: String(e.user.id),
+        name: [e.user.first_name, e.user.last_name].filter(Boolean).join(" "),
+        username: e.user.username ?? null,
+      };
+    }
+    if (e.type === "mention") {
+      const handle = text.slice(e.offset + 1, e.offset + e.length);
+      // @username orqali tag qilinganda Telegram ID bermaydi — username yetarli
+      return { tgId: null, name: handle, username: handle };
+    }
   }
-  await prisma.request.update({
-    where: { id },
-    data: {
-      assigneeTgId: String(tgId),
-      assigneeName: [picked.user.first_name, picked.user.last_name].filter(Boolean).join(" "),
-      assigneeUsername: picked.user.username ?? null,
-    },
-  });
-  await ctx.answerCallbackQuery({ text: "Mas'ul belgilandi" });
-  await refreshCard(ctx.api, id);
+  return null;
+}
 
-  const updated = await prisma.request.findUnique({ where: { id } });
-  if (updated) {
-    await noteOnCard(ctx, updated, `🙋 ${mentionAssignee(updated)} — <code>${ticketId(r.ticketNumber)}</code> sizga biriktirildi.`);
+/**
+ * Guruhda botning "kimga berasiz?" xabariga reply kelganda ishlaydi.
+ * So'rov ticket raqamidan topiladi — qo'shimcha ustun kerak emas.
+ */
+export async function handleAssignReply(ctx: MyContext): Promise<boolean> {
+  const msg = ctx.message;
+  const replied = msg?.reply_to_message;
+  if (!msg || !replied) return false;
+
+  const src = ("text" in replied && replied.text) || "";
+  if (!src.includes(ASSIGN_PROMPT_MARK)) return false;
+  const ticket = src.match(/ES-?(\d+)/i);
+  if (!ticket) return false;
+
+  const r = await prisma.request.findUnique({ where: { ticketNumber: Number(ticket[1]) } });
+  if (!r) return false;
+
+  const picked = readMention(msg);
+  if (!picked) {
+    await ctx.reply("Mas'ulni tag qiling — masalan @username.", {
+      reply_parameters: { message_id: msg.message_id, allow_sending_without_reply: true },
+    });
+    return true;
   }
+
+  await prisma.request.update({
+    where: { id: r.id },
+    data: { assigneeTgId: picked.tgId, assigneeName: picked.name, assigneeUsername: picked.username },
+  });
+  await refreshCard(ctx.api, r.id);
+
+  const updated = await prisma.request.findUnique({ where: { id: r.id } });
+  if (updated) {
+    await noteOnCard(
+      ctx,
+      updated,
+      `🙋 ${mentionAssignee(updated)} — <code>${ticketId(r.ticketNumber)}</code> sizga biriktirildi.`
+    );
+  }
+  return true;
 }
 
 const DUE_CHOICES: { label: string; days: number }[] = [

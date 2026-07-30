@@ -12,7 +12,9 @@ import {
   handleFwdSchoolNew,
   handleFwdSchoolText,
   handleFwdSystem,
-  handleFwdSystemMenu,
+  handleCollectDone,
+  handleCollectText,
+  handleOtherSchool,
   handleFwdType,
   handleSchoolNewAnyway,
   handleSchoolSame,
@@ -64,8 +66,8 @@ import {
   startLogWizard,
 } from "./handlers/supportLog";
 import {
-  handleAssignMenu,
-  handleAssignPick,
+  handleAssignAsk,
+  handleAssignReply,
   handleCardBack,
   handleClaim,
   handleDone,
@@ -375,11 +377,16 @@ function createBot(): Bot<MyContext> {
   bot.callbackQuery(/^rq:done:(\d+)$/, (ctx) => handleDone(ctx, Number(ctx.match[1])));
   bot.callbackQuery(/^rq:reopen:(\d+)$/, (ctx) => handleReopen(ctx, Number(ctx.match[1])));
   bot.callbackQuery(/^rq:claim:(\d+)$/, (ctx) => handleClaim(ctx, Number(ctx.match[1])));
-  bot.callbackQuery(/^rq:assign:(\d+)$/, (ctx) => handleAssignMenu(ctx, Number(ctx.match[1])));
-  bot.callbackQuery(/^rq:asg:(\d+):(\d+)$/, (ctx) => handleAssignPick(ctx, Number(ctx.match[1]), Number(ctx.match[2])));
+  bot.callbackQuery(/^rq:assign:(\d+)$/, (ctx) => handleAssignAsk(ctx, Number(ctx.match[1])));
   bot.callbackQuery(/^rq:due:(\d+)$/, (ctx) => handleDueMenu(ctx, Number(ctx.match[1])));
   bot.callbackQuery(/^rq:dueset:(\d+):(-?\d+)$/, (ctx) => handleDueSet(ctx, Number(ctx.match[1]), Number(ctx.match[2])));
   bot.callbackQuery(/^rq:back:(\d+)$/, (ctx) => handleCardBack(ctx, Number(ctx.match[1])));
+
+  // Guruhda botning "kimga berasiz?" so'roviga reply kelsa — mas'ulni tag'dan o'qiymiz
+  bot.on("message", async (ctx, next) => {
+    if (ctx.chat.type !== "private" && (await handleAssignReply(ctx))) return;
+    await next();
+  });
 
   // Qolgan hamma narsa faqat shaxsiy chatda
   bot.use(async (ctx, next) => {
@@ -419,7 +426,8 @@ function createBot(): Bot<MyContext> {
 
   // Forward oqimining tugmalari
   bot.callbackQuery("fwd:cancel", cancelForward);
-  bot.callbackQuery("fwd:sysmenu", handleFwdSystemMenu);
+  bot.callbackQuery("fwd:more", handleCollectDone);
+  bot.callbackQuery("fwd:otherschool", handleOtherSchool);
   bot.callbackQuery("fwd:schoolnew", handleFwdSchoolNew);
   bot.callbackQuery(/^fwd:samesch:(\d+)$/, (ctx) => handleSchoolSame(ctx, Number(ctx.match[1])));
   bot.callbackQuery("fwd:newsch", handleSchoolNewAnyway);
@@ -486,12 +494,15 @@ function createBot(): Bot<MyContext> {
         return handleDescStep(ctx, text);
       // Maktab bosqichlarining hammasida yozilgan matn nom deb qabul qilinadi —
       // operator tugmani bosish o'rniga yozsa qoralama yo'qolmasin
+      case "fwd_collect":
+        return handleCollectText(ctx, text);
       case "fwd_school":
       case "fwd_school_text":
       case "fwd_school_confirm":
         return handleFwdSchoolText(ctx, text);
       case "fwd_type":
       case "fwd_module":
+      case "fwd_system":
         return remindToUseButtons(ctx);
       case "fix_school_text":
         return handleFixSchoolInput(ctx, text);

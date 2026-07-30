@@ -14,11 +14,16 @@ export type CardRequest = Request & {
 
 export const cardInclude = { system: true, module: true, school: true, operator: true } as const;
 
-/** Mas'ul odamni tag qiladigan HTML havola (username bo'lmasa ham bildirishnoma boradi) */
+/**
+ * Mas'ul odamni tag qiladigan matn.
+ * @username orqali tayinlanganda Telegram ID bermaydi — o'shanda username bilan
+ * tag qilamiz; ID bo'lsa (tugma yoki text_mention) havola bilan.
+ */
 export function mentionAssignee(r: Pick<Request, "assigneeTgId" | "assigneeName" | "assigneeUsername">): string {
-  if (!r.assigneeTgId) return "";
+  // ID barqarorroq (username o'zgarishi mumkin), shuning uchun avval o'sha
+  if (r.assigneeTgId) return `<a href="tg://user?id=${r.assigneeTgId}">${escapeHtml(r.assigneeName ?? "mas'ul")}</a>`;
   if (r.assigneeUsername) return `@${escapeHtml(r.assigneeUsername)}`;
-  return `<a href="tg://user?id=${r.assigneeTgId}">${escapeHtml(r.assigneeName ?? "mas'ul")}</a>`;
+  return "";
 }
 
 function deadlineLine(r: CardRequest): string {
@@ -35,9 +40,13 @@ export async function renderCardText(r: CardRequest): Promise<string> {
     ? `${escapeHtml(op.fullName)} (@${escapeHtml(op.username)})`
     : escapeHtml(op.fullName);
 
-  const assignee = r.assigneeTgId
-    ? `🙋 Mas'ul: ${r.assigneeUsername ? `${escapeHtml(r.assigneeName ?? "")} (@${escapeHtml(r.assigneeUsername)})` : escapeHtml(r.assigneeName ?? "")}`
-    : "";
+  const assigneeLabel =
+    r.assigneeUsername && r.assigneeName && r.assigneeName !== r.assigneeUsername
+      ? `${escapeHtml(r.assigneeName)} (@${escapeHtml(r.assigneeUsername)})`
+      : r.assigneeUsername
+        ? `@${escapeHtml(r.assigneeUsername)}`
+        : escapeHtml(r.assigneeName ?? "");
+  const assignee = assigneeLabel ? `🙋 Mas'ul: ${assigneeLabel}` : "";
 
   return [
     ...(r.done ? [`✅ <b>BAJARILDI</b> — ${escapeHtml(r.doneByName ?? "—")} · ${formatSpan(r.createdAt, r.doneAt ?? new Date())}`, ""] : []),

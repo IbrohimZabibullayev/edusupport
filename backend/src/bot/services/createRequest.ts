@@ -17,7 +17,8 @@ export async function createRequestFromDraft(api: Api, op: Operator, draft: Requ
   const request = await prisma.request.create({
     data: {
       type: draft.type as string,
-      systemId: draft.systemId ?? null,
+      // -1 — "tizim yo'q" sentineli (forward oqimida savol o'tkazib yuborilgan)
+      systemId: draft.systemId && draft.systemId > 0 ? draft.systemId : null,
       moduleId: draft.moduleId as number,
       schoolId: draft.schoolId as number,
       operatorId: op.id,

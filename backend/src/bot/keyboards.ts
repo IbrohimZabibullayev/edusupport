@@ -67,11 +67,9 @@ export const submitKeyboard = new Keyboard()
 
 export const FWD_CANCEL = "❌ Bekor qilish";
 
-/** So'rov turi + tizimni almashtirish qatori */
-export function fwdTypeKeyboard(types: { key: string; name: string; emoji: string }[], canSwitchSystem: boolean): InlineKeyboard {
+export function fwdTypeKeyboard(types: { key: string; name: string; emoji: string }[]): InlineKeyboard {
   const kb = new InlineKeyboard();
   for (const t of types) kb.text(requestTypeLabel(t), `fwd:type:${t.key}`).row();
-  if (canSwitchSystem) kb.text("🖥 Tizimni almashtirish", "fwd:sysmenu").row();
   return kb.text(FWD_CANCEL, "fwd:cancel");
 }
 

@@ -9,6 +9,8 @@ export type Step =
   | "req_module"
   | "req_school"
   | "req_desc"
+  | "fwd_collect"
+  | "fwd_system"
   | "fwd_type"
   | "fwd_module"
   | "fwd_school"
@@ -51,6 +53,8 @@ export interface RequestDraft {
   /** Maktab nomi yozilib, o'xshashi topilganda tasdiqlash uchun */
   pendingSchoolName?: string;
   similarSchoolIds?: number[];
+  /** Maktab operator tomonidan tasdiqlanganmi — xotiradan kelgani ham so'raladi */
+  schoolConfirmed?: boolean;
 }
 
 export interface SupportLogDraft {

@@ -2,7 +2,7 @@ import { InlineKeyboard } from "grammy";
 import { Message } from "grammy/types";
 import { prisma } from "../../db";
 import { escapeHtml, ticketId } from "../../util";
-import { fwdModuleKeyboard, fwdSchoolKeyboard, fwdSystemKeyboard, fwdTypeKeyboard } from "../keyboards";
+import { FWD_CANCEL, fwdModuleKeyboard, fwdSchoolKeyboard, fwdSystemKeyboard, fwdTypeKeyboard } from "../keyboards";
 import { clientKeyOf, findClientSource, rememberClient } from "../services/clients";
 import { draftDescription, extractMedia } from "../services/content";
 import { createRequestFromDraft } from "../services/createRequest";
@@ -16,7 +16,15 @@ import { MyContext, RequestDraft, Step } from "../types";
 import { requireApprovedOperator } from "./registration";
 
 /** Forward oqimining bosqichlari — shu holatlarda kelgan yangi forward mavjud qoralamaga qo'shiladi */
-const FWD_STEPS: Step[] = ["fwd_type", "fwd_module", "fwd_school", "fwd_school_text", "fwd_school_confirm"];
+const FWD_STEPS: Step[] = [
+  "fwd_collect",
+  "fwd_system",
+  "fwd_type",
+  "fwd_module",
+  "fwd_school",
+  "fwd_school_text",
+  "fwd_school_confirm",
+];
 
 /**
  * Shuncha vaqtdan keyin qoralama "tashlab ketilgan" hisoblanadi va yangi forward
@@ -57,8 +65,10 @@ function collectedCount(draft: RequestDraft): number {
 
 /**
  * Operator mijoz xabarini botga forward qilganda ishlaydi.
- * Maktab mijoz chatidan, tur va modul matndan taxmin qilinadi —
- * hammasi ma'lum bo'lsa so'rov hech narsa so'ramasdan yuboriladi.
+ *
+ * Avval hamma xabar yig'iladi ("Davom etish" bosilgunicha), keyingina savollar
+ * beriladi — shunda taxminlar to'liq matn asosida ishlaydi va operator
+ * qo'shimcha yozishga ulguradi.
  */
 export async function handleForward(ctx: MyContext): Promise<void> {
   const op = await requireApprovedOperator(ctx);
@@ -66,17 +76,15 @@ export async function handleForward(ctx: MyContext): Promise<void> {
   const msg = ctx.message;
   if (!msg) return;
 
-  // Ketma-ket kelgan forwardlar (albom yoki bir necha xabar) bitta so'rovga yig'iladi.
-  // Lekin bu faqat "hozir yig'ilayotgan" qoralama uchun — yarim tashlab ketilgan
-  // eski qoralama yangi murojaatni yutib yubormasligi kerak.
+  // Yig'ish davom etayotgan bo'lsa — o'sha qoralamaga qo'shamiz.
+  // TTL yarim tashlab ketilgan eski qoralama yangi murojaatni yutmasligi uchun.
   const current = ctx.session.draft;
   if (inForwardFlow(ctx.session.step) && current && Date.now() - (current.lastAt ?? 0) < DRAFT_TTL_MS) {
     if (!collect(current, msg)) return;
     current.lastAt = Date.now();
     ctx.session.draft = current;
-    // Qabul qilinganini ko'rsatish uchun joriy savolni qayta chizamiz
-    await continueFlow(ctx, current);
-    return;
+    if (ctx.session.step === "fwd_collect") return askMore(ctx, current);
+    return continueFlow(ctx, current);
   }
 
   const draft: RequestDraft = { lastAt: Date.now() };
@@ -85,44 +93,80 @@ export async function handleForward(ctx: MyContext): Promise<void> {
     return;
   }
 
-  // Tizim — operatorning oxirgi so'rovidan
-  const last = await prisma.request.findFirst({
-    where: { operatorId: op.id, NOT: { systemId: null } },
-    orderBy: { id: "desc" },
-    select: { systemId: true },
-  });
-  draft.systemId = last?.systemId ?? undefined;
-
-  // Maktab — shu mijozdan avval xabar kelgan bo'lsa o'sha
+  // Mijozni eslab qolamiz — maktab taxmini shundan chiqadi.
+  // Forward manbasi yashirin bo'lsa client null bo'ladi, o'shanda taxmin ham bo'lmaydi.
   const client = clientKeyOf(msg);
   if (client) {
     draft.clientKey = client.key;
     draft.clientLabel = client.label;
-    const source = await findClientSource(client.key);
-    if (source) {
-      draft.schoolId = source.schoolId;
-      draft.type = source.lastTypeKey ?? undefined;
-      draft.moduleId = source.lastModuleId ?? undefined;
-    }
   }
 
-  // Tur va modul — matndan (mijoz xotirasidan ustun)
-  const guess = await guessFromText(draftDescription(draft.descTexts ?? [], draft.attachments ?? []));
-  if (guess.typeKey) draft.type = guess.typeKey;
-  if (guess.moduleId) draft.moduleId = guess.moduleId;
+  ctx.session.draft = draft;
+  await askMore(ctx, draft);
+}
 
+/** Yig'ish bosqichi: yana forward yoki matn kutamiz, "Davom etish" bosilishi kerak */
+async function askMore(ctx: MyContext, draft: RequestDraft): Promise<void> {
+  ctx.session.step = "fwd_collect";
+  await showPrompt(
+    ctx,
+    draft,
+    [
+      promptHeader(draft),
+      "",
+      "Yana qo'shimcha bormi? Xabar forward qiling yoki shu yerga yozing.",
+      "Tugagan bo'lsa — <b>Davom etish</b>.",
+    ].join("\n"),
+    new InlineKeyboard().text("▶️ Davom etish", "fwd:more").row().text(FWD_CANCEL, "fwd:cancel")
+  );
+}
+
+/** Yig'ish bosqichida operator qo'shimcha matn yozsa */
+export async function handleCollectText(ctx: MyContext, text: string): Promise<void> {
+  const draft = ctx.session.draft;
+  if (!draft) {
+    ctx.session.step = "idle";
+    return;
+  }
+  draft.descTexts = [...(draft.descTexts ?? []), text];
+  draft.lastAt = Date.now();
+  ctx.session.draft = draft;
+  await askMore(ctx, draft);
+}
+
+/** "Davom etish" — yig'ish tugadi, endi taxmin qilib savollarga o'tamiz */
+export async function handleCollectDone(ctx: MyContext): Promise<void> {
+  const draft = await activeDraft(ctx);
+  if (!draft) return;
+  await ctx.answerCallbackQuery();
+
+  // Maktab — shu mijozdan avval xabar kelgan bo'lsa taxmin qilamiz (tasdiqlanmagan)
+  if (draft.clientKey && draft.schoolId === undefined) {
+    const source = await findClientSource(draft.clientKey);
+    if (source) draft.schoolId = source.schoolId;
+  }
+  // So'rov turi matndan; topilmasa mijozning oxirgi turidan
+  if (!draft.type) {
+    const guess = await guessFromText(draftDescription(draft.descTexts ?? [], draft.attachments ?? []));
+    if (guess.typeKey) draft.type = guess.typeKey;
+    else if (draft.clientKey) {
+      const source = await findClientSource(draft.clientKey);
+      draft.type = source?.lastTypeKey ?? undefined;
+    }
+  }
   ctx.session.draft = draft;
   await continueFlow(ctx, draft);
 }
 
 /**
- * Yetishmagan birinchi maydonni so'raydi; hammasi to'liq bo'lsa yuboradi.
- * Har javobdan keyin qayta chaqiriladi.
+ * Savollar tartibi: maktab → tizim → modul.
+ * So'rov turi matndan taxmin qilinadi va faqat topilmasa so'raladi.
  */
 export async function continueFlow(ctx: MyContext, draft: RequestDraft): Promise<void> {
-  if (!draft.type) return askType(ctx, draft);
+  if (!draft.schoolConfirmed) return askSchool(ctx, draft);
+  if (!draft.systemId) return askSystem(ctx, draft);
   if (!draft.moduleId) return askModule(ctx, draft);
-  if (!draft.schoolId) return askSchool(ctx, draft);
+  if (!draft.type) return askType(ctx, draft);
   return submitForward(ctx, draft);
 }
 
@@ -133,30 +177,33 @@ function promptHeader(draft: RequestDraft): string {
   return `📥 <b>Mijoz xabari qabul qilindi</b> (${collectedCount(draft)} ta)`;
 }
 
-async function typePromptText(draft: RequestDraft): Promise<string> {
-  const systems = await getActiveSystems();
-  const system = systems.find((s) => s.id === draft.systemId);
-  return [
-    promptHeader(draft),
-    `🖥 Tizim: ${system ? escapeHtml(system.name) : "belgilanmagan"}`,
-    "",
-    "So'rov turini tanlang:",
-  ].join("\n");
-}
-
 async function askType(ctx: MyContext, draft: RequestDraft): Promise<void> {
   ctx.session.step = "fwd_type";
-  const kb = fwdTypeKeyboard(await getActiveRequestTypes(), (await getActiveSystems()).length > 0);
-  const text = await typePromptText(draft);
-  if (draft.promptMessageId && ctx.chat) {
-    await ctx.api
-      .editMessageText(ctx.chat.id, draft.promptMessageId, text, { parse_mode: "HTML", reply_markup: kb })
-      .catch(() => undefined);
-    return;
+  await showPrompt(
+    ctx,
+    draft,
+    `${promptHeader(draft)}\n\nSo'rov turini tanlang:`,
+    fwdTypeKeyboard(await getActiveRequestTypes())
+  );
+}
+
+/* ---------- Tizim ---------- */
+
+async function askSystem(ctx: MyContext, draft: RequestDraft): Promise<void> {
+  const systems = await getActiveSystems();
+  // Tizim bitta bo'lsa so'rashning ma'nosi yo'q
+  if (systems.length === 1) {
+    draft.systemId = systems[0].id;
+    ctx.session.draft = draft;
+    return continueFlow(ctx, draft);
   }
-  const sent = await ctx.reply(text, { parse_mode: "HTML", reply_markup: kb });
-  draft.promptMessageId = sent.message_id;
-  ctx.session.draft = draft;
+  if (systems.length === 0) {
+    draft.systemId = -1; // tizim yo'q — savolni o'tkazib yuboramiz
+    ctx.session.draft = draft;
+    return continueFlow(ctx, draft);
+  }
+  ctx.session.step = "fwd_system";
+  await showPrompt(ctx, draft, `${promptHeader(draft)}\n\nQaysi tizim bo'yicha?`, fwdSystemKeyboard(systems));
 }
 
 /* ---------- Modul ---------- */
@@ -173,9 +220,42 @@ async function askModule(ctx: MyContext, draft: RequestDraft): Promise<void> {
 
 /* ---------- Maktab ---------- */
 
+/**
+ * Maktab har safar tasdiqlanadi. Mijoz tanish bo'lsa taxmin ko'rsatiladi
+ * ("Bu Najot Ta'limmi?"), aks holda oxirgi ishlatilgan maktablar ro'yxati.
+ */
 async function askSchool(ctx: MyContext, draft: RequestDraft): Promise<void> {
   const op = await requireApprovedOperator(ctx);
-  const recent = op ? await recentSchools(op.id) : [];
+  if (!op) return;
+
+  if (draft.schoolId !== undefined) {
+    const guess = await prisma.school.findUnique({ where: { id: draft.schoolId } });
+    if (guess) {
+      ctx.session.step = "fwd_school";
+      await showPrompt(
+        ctx,
+        draft,
+        [
+          promptHeader(draft),
+          draft.clientLabel ? `👤 Kimdan: ${escapeHtml(draft.clientLabel)}` : "",
+          "",
+          `Bu <b>${escapeHtml(guess.name)}</b>mi?`,
+        ]
+          .filter(Boolean)
+          .join("\n"),
+        new InlineKeyboard()
+          .text(`✅ Ha, ${guess.name}`, `fwd:school:${guess.id}`)
+          .row()
+          .text("🔄 Boshqa maktab", "fwd:otherschool")
+          .row()
+          .text(FWD_CANCEL, "fwd:cancel")
+      );
+      return;
+    }
+    draft.schoolId = undefined;
+  }
+
+  const recent = await recentSchools(op.id);
   if (recent.length === 0) {
     ctx.session.step = "fwd_school_text";
     await showPrompt(ctx, draft, `${promptHeader(draft)}\n\nMaktab/muassasa nomini yozing:`);
@@ -188,6 +268,16 @@ async function askSchool(ctx: MyContext, draft: RequestDraft): Promise<void> {
     `${promptHeader(draft)}\n\nQaysi maktab?\n<i>Ro'yxatda bo'lmasa — nomini shunchaki yozing.</i>`,
     fwdSchoolKeyboard(recent)
   );
+}
+
+/** "Boshqa maktab" — taxminni rad etib ro'yxatga o'tamiz */
+export async function handleOtherSchool(ctx: MyContext): Promise<void> {
+  const draft = await activeDraft(ctx);
+  if (!draft) return;
+  draft.schoolId = undefined;
+  ctx.session.draft = draft;
+  await ctx.answerCallbackQuery();
+  await askSchool(ctx, draft);
 }
 
 /**
@@ -244,21 +334,13 @@ async function activeDraft(ctx: MyContext): Promise<RequestDraft | null> {
   return draft;
 }
 
-export async function handleFwdSystemMenu(ctx: MyContext): Promise<void> {
-  if (!(await activeDraft(ctx))) return;
-  await ctx.answerCallbackQuery();
-  await ctx.editMessageText("Qaysi tizim bo'yicha so'rov?", {
-    reply_markup: fwdSystemKeyboard(await getActiveSystems()),
-  });
-}
-
 export async function handleFwdSystem(ctx: MyContext, systemId: number): Promise<void> {
   const draft = await activeDraft(ctx);
   if (!draft) return;
   draft.systemId = systemId;
   ctx.session.draft = draft;
   await ctx.answerCallbackQuery();
-  await askType(ctx, draft);
+  await continueFlow(ctx, draft);
 }
 
 export async function handleFwdType(ctx: MyContext, key: string): Promise<void> {
@@ -291,6 +373,7 @@ export async function handleFwdSchool(ctx: MyContext, schoolId: number): Promise
   const draft = await activeDraft(ctx);
   if (!draft) return;
   draft.schoolId = schoolId;
+  draft.schoolConfirmed = true;
   ctx.session.draft = draft;
   await ctx.answerCallbackQuery();
   await continueFlow(ctx, draft);
@@ -308,6 +391,7 @@ export async function handleSchoolSame(ctx: MyContext, schoolId: number): Promis
   if (!draft?.similarSchoolIds?.includes(schoolId)) return;
   reusePromptMessage(ctx, draft);
   draft.schoolId = schoolId;
+  draft.schoolConfirmed = true;
   draft.similarSchoolIds = undefined;
   draft.pendingSchoolName = undefined;
   ctx.session.draft = draft;
@@ -328,6 +412,7 @@ export async function handleSchoolNewAnyway(ctx: MyContext): Promise<void> {
     `🏫 <b>Yangi maktab qo'shildi:</b> ${escapeHtml(school.name)}\n👤 Operator: ${escapeHtml(op.fullName)}`
   );
   draft.schoolId = school.id;
+  draft.schoolConfirmed = true;
   draft.similarSchoolIds = undefined;
   draft.pendingSchoolName = undefined;
   ctx.session.draft = draft;
@@ -352,6 +437,7 @@ export async function handleFwdSchoolText(ctx: MyContext, text: string): Promise
   const match = await matchSchool(text);
   if (match.kind === "exact") {
     draft.schoolId = match.school.id;
+    draft.schoolConfirmed = true;
     ctx.session.draft = draft;
     await continueFlow(ctx, draft);
     return;
@@ -385,6 +471,7 @@ export async function handleFwdSchoolText(ctx: MyContext, text: string): Promise
     `🏫 <b>Yangi maktab qo'shildi:</b> ${escapeHtml(school.name)}\n👤 Operator: ${escapeHtml(op.fullName)}`
   );
   draft.schoolId = school.id;
+  draft.schoolConfirmed = true;
   ctx.session.draft = draft;
   await continueFlow(ctx, draft);
 }

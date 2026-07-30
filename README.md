@@ -14,31 +14,27 @@ Operatorlar bot orqali so'rov (bug / muammo-savol / taklif) kiritadi, buglar dev
 | 📩 **Forward** | mijoz xabarini botga forward qilish — tamom | kundalik ish |
 | ➕ **To'liq shakl** | `/new` → tizim → tur → modul → maktab → izoh → jo'natish | so'rovni o'zingiz yozganda |
 
-### Forward: bot o'zi to'ldiradi
-
-Operator mijozning xabarini botga forward qiladi — boshqa hech narsa qilmaydi. Bot uch narsani o'zi aniqlaydi:
-
-| Maydon | Qayerdan |
-|---|---|
-| 🏫 **Maktab** | **shu mijozdan avval kelgan xabardan.** Birinchi marta so'raydi, keyin hech qachon so'ramaydi |
-| 💡 **So'rov turi** | hashtagdan (`#taklif`, `#bug`) yoki matndagi so'zdan («ishlamayapti» → Bug) |
-| 🧩 **Modul** | matndagi so'zdan («chek», «davomat», «shop») yoki modul nomidan |
-| 🖥 **Tizim** | operatorning oxirgi so'rovidan |
-
-Hammasi aniqlansa so'rov **hech narsa so'ralmasdan** guruhga ketadi, operatorga esa qisqa tasdiq keladi:
+### Forward: yig'ib olib, keyin so'raydi
 
 ```
-✅ ES-0021 guruhga yuborildi
-💡 Taklif · 🏆 Gamifikatsiya
-🏫 Najot Ta'lim
-[ ✏️ Tuzatish ]
+1. Mijoz xabar(lar)ini forward qilasiz
+2. Bot: "Yana qo'shimcha bormi?"   → yana forward yoki o'zingiz yozasiz
+                                     tugagach [▶️ Davom etish]
+3. Bot: "Bu Najot Ta'limmi?"       → tasdiq
+4. Bot: "Qaysi tizim?"             → tanlash
+5. Bot: "Qaysi modul?"             → tanlash
+6. ✅ Yuborildi                     [✏️ Tuzatish]
 ```
 
-Xato bo'lsa «✏️ Tuzatish» bosiladi — tur/modul/maktab almashtiriladi, **guruhdagi karta ham darhol yangilanadi** va tuzatish o'sha mijozning xotirasiga yoziladi (keyingi safar to'g'ri taxmin qilinadi).
+**Nega avval yig'iladi?** Operator ko'pincha bir necha xabarni ketma-ket tashlaydi va oxirida o'zi ham izoh qo'shadi. Savollar oxirida berilgani uchun taxminlar **to'liq matn** asosida ishlaydi.
 
-Aniqlab bo'lmagan maydon bo'lsa faqat **o'shanisi** so'raladi. Yangi mijoz uchun bu odatda bitta savol — maktab.
+**So'rov turi so'ralmaydi** — matndan aniqlanadi: hashtag (`#taklif`, `#bug`) eng kuchli signal, keyin kalit so'zlar («ishlamayapti» → Bug, «qo'shsak» → Taklif). Aniqlab bo'lmasagina so'raladi.
 
-Bir nechta xabarni ketma-ket forward qilsa (albom ham) hammasi bitta so'rovga yig'iladi.
+**Maktab har safar tasdiqlatiladi.** Shu mijozdan avval xabar kelgan bo'lsa bot taxminni ko'rsatadi (`Bu Najot Ta'limmi?`), aks holda oxirgi ishlatilgan maktablar ro'yxatini beradi. Forward manbasi yashirin bo'lsa taxmin bo'lmaydi — shuning uchun tasdiq har doim so'raladi.
+
+Yuborilgandan keyin «✏️ Tuzatish» bilan tur/modul/maktabni almashtirish mumkin — **guruhdagi karta ham darhol yangilanadi** va tuzatish o'sha mijozning xotirasiga yoziladi.
+
+> Yarim tashlab ketilgan qoralama 5 daqiqadan keyin «eskirgan» hisoblanadi — yangi forward unga qo'shilmay, yangi so'rov boshlaydi.
 
 > Taxmin kalit so'zlari `GuessKeyword` jadvalida — birinchi ishga tushishda ~100 tasi avtomatik qo'shiladi (o'zbekcha, kirill va ruscha variantlar bilan).
 
@@ -131,7 +127,7 @@ Har bir karta ostida tugmalar turadi — hech narsa yozish kerak emas:
 |---|---|
 | ✅ **Bajarildi** | So'rovni yopadi, **kim bosgani** bazaga yoziladi, karta yangilanadi va **operatorga DM boradi** |
 | 🙋 **Men olaman** | Bosgan odam mas'ul bo'ladi |
-| 👤 **Boshqaga berish** | Guruh **adminlari** ro'yxatidan mas'ul tanlanadi va o'sha odam tag qilinadi |
+| 👤 **Boshqaga berish** | Bot tugmani bosgan odamni tag qilib «kimga berasiz?» deb so'raydi; u shu xabarga **reply qilib mas'ulni tag qiladi** |
 | ⏰ **Muddat** | Bugun / Ertaga / 3 kun / 1 hafta |
 | 🔄 **Qayta ochish** | Yopilgan so'rovni qaytaradi va guruhga xabar beradi |
 
@@ -139,7 +135,7 @@ Har bir karta ostida tugmalar turadi — hech narsa yozish kerak emas:
 
 **Muddat eslatmasi.** Har kuni **09:00 (Asia/Tashkent)** bot muddati bugun tugaydigan va kechikkan, hali yopilmagan so'rovlarni topadi va o'sha kartaga reply qilib mas'ulni tag qiladi: «bu taskda o'zgarish bormi?» — ostida `✅ Bajarildi` va `⏰ +1 kun` tugmalari bilan. Kechikkan so'rov yopilguncha har kuni eslatiladi (kuniga bir marta).
 
-> ℹ️ **Nega mas'ul ro'yxati faqat adminlardan?** Telegram Bot API guruhning oddiy a'zolari ro'yxatini bermaydi — faqat `getChatAdministrators` bor. Shuning uchun devlarni guruhda admin qiling, yoki ular «🙋 Men olaman» tugmasini o'zlari bossin (bu har doim ishlaydi).
+> ℹ️ **Nega mas'ul ro'yxatdan tanlanmaydi?** Telegram Bot API guruhning oddiy a'zolari ro'yxatini bermaydi — faqat adminlarni ko'ra oladi. Shuning uchun ro'yxat tuzilmaydi: bot «kimga berasiz?» deb so'raydi, odam esa reply qilib mas'ulni o'zi tag qiladi. `@username` bilan ham, usernamesiz odamni tanlab ham ishlaydi.
 >
 > ℹ️ **Nega eslatma guruhda, DM'da emas?** Bot o'zi birinchi bo'lib hech kimga DM yoza olmaydi — odam avval botga `/start` bosishi kerak. Devlar buni qilmagan bo'lishi mumkin, shuning uchun eslatma guruhda tag orqali boradi (tag baribir bildirishnoma beradi). Operatorga esa DM boradi, chunki u botda ro'yxatdan o'tgan.
 
