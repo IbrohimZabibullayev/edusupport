@@ -1,10 +1,10 @@
 import { InlineKeyboard } from "grammy";
 import { escapeHtml } from "../../util";
-import { buildModuleKeyboard, submitKeyboard } from "../keyboards";
-import { getActiveModules } from "../services/modules";
+import { backCancelKeyboard, submitKeyboard } from "../keyboards";
+
 import { notifyAdmins } from "../services/notify";
 import { createSchool, matchSchool } from "../services/schools";
-import { ASK_DESC, ASK_LOG_MODULE } from "../texts";
+import { ASK_DESC, ASK_LOG_PROBLEM } from "../texts";
 import { MyContext, SchoolFlow } from "../types";
 import { requireApprovedOperator } from "./registration";
 
@@ -108,7 +108,8 @@ async function continueAfterSchool(ctx: MyContext, flow: SchoolFlow, schoolId: n
     await ctx.reply(ASK_DESC, { reply_markup: submitKeyboard });
     return;
   }
+  // Support logda markaz moduldan keyin so'raladi, ya'ni keyingi qadam — muammo
   ctx.session.logDraft = { ...ctx.session.logDraft, schoolId };
-  ctx.session.step = "log_module";
-  await ctx.reply(ASK_LOG_MODULE, { reply_markup: buildModuleKeyboard(await getActiveModules()) });
+  ctx.session.step = "log_problem";
+  await ctx.reply(ASK_LOG_PROBLEM, { reply_markup: backCancelKeyboard });
 }

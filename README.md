@@ -64,6 +64,8 @@ Bazada shunga o'xshash maktablar bor. Qaysi biri?
 
 Bundan tashqari operatorlar **Support log** yuritadi — dasturchisiz o'zi (mijoz bilan meet qilib) hal qilgan muammolarni yozib boradi. Bu guruhga yuborilmaydi, faqat hisob-kitob uchun: qaysi modulda qancha muammo, qancha vaqt ketgani, takroriyligi va kim ishlagani. Bot menyusidagi «📋 Support log» tugmasi yoki `/log` orqali kiritiladi, admin panelda jadval + statistika ko'rinadi.
 
+Tartibi: **tizim → modul → markaz → muammo → prioritet → ketgan vaqt → takroriymi**.
+
 ---
 
 ## 1. Botni BotFather'da yaratish

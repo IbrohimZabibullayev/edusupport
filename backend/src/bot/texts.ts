@@ -16,3 +16,4 @@ export const ASK_DESC = [
 ].join("\n");
 
 export const ASK_LOG_MODULE = "Muammo qaysi modulda edi?";
+export const ASK_LOG_PROBLEM = "Muammoni qisqacha yozing (erkin matn):";
