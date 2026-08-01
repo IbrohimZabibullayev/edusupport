@@ -1,9 +1,15 @@
 import { InlineKeyboard, Keyboard } from "grammy";
 import { moduleLabel } from "./services/modules";
 import { requestTypeLabel } from "./services/requestTypes";
-import { BTN_BACK, BTN_CANCEL, BTN_NEW_REQUEST, BTN_NO, BTN_SUBMIT, BTN_SUPPORT_LOG, BTN_YES } from "./texts";
+import { BTN_BACK, BTN_CANCEL, BTN_NEW_REQUEST, BTN_NO, BTN_SUBMIT, BTN_SUPPORT_LOG, BTN_TASKS, BTN_YES } from "./texts";
 
-export const mainMenu = new Keyboard().text(BTN_NEW_REQUEST).text(BTN_SUPPORT_LOG).resized().persistent();
+export const mainMenu = new Keyboard()
+  .text(BTN_NEW_REQUEST)
+  .text(BTN_SUPPORT_LOG)
+  .row()
+  .text(BTN_TASKS)
+  .resized()
+  .persistent();
 
 export const contactKeyboard = new Keyboard()
   .requestContact("📱 Raqamni yuborish")

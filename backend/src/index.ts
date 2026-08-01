@@ -2,6 +2,7 @@ import { config } from "./config";
 import { createServer } from "./api/server";
 import { bot } from "./bot/bot";
 import { startDeadlineReminderJob } from "./jobs/deadlineReminder";
+import { startTaskReminderJob } from "./jobs/taskReminder";
 import { startWeeklyReportJob } from "./jobs/weeklyReport";
 import {
   backfillSchoolKeys,
@@ -29,6 +30,7 @@ async function main(): Promise<void> {
 
   startWeeklyReportJob(bot);
   startDeadlineReminderJob(bot);
+  startTaskReminderJob(bot);
 
   bot
     .start({

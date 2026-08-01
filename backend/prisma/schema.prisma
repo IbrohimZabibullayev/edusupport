@@ -95,6 +95,29 @@ model Operator {
   requests   Request[]
   schools    School[]       @relation("SchoolCreator")
   supportLogs SupportLog[]
+  tasks      OperatorTask[]
+}
+
+/**
+ * Operatorning shaxsiy rejasi (meeting, qo'ng'iroq va h.k.).
+ * So'rovlarga bog'lanmagan — faqat egasi ko'radi va boshqaradi.
+ */
+model OperatorTask {
+  id         Int       @id @default(autoincrement())
+  operatorId Int
+  operator   Operator  @relation(fields: [operatorId], references: [id])
+  title      String
+  /** Kim bilan — ixtiyoriy */
+  withWhom   String?
+  dueAt      DateTime
+  done       Boolean   @default(false)
+  doneAt     DateTime?
+  /** Eslatma yuborilgan payt — bir marta eslatish uchun */
+  remindedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([operatorId, dueAt])
+  @@index([dueAt])
 }
 
 model School {

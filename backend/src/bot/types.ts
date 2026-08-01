@@ -18,6 +18,9 @@ export type Step =
   | "fwd_school_confirm"
   | "fix_school_text"
   | "school_confirm"
+  | "task_title"
+  | "task_with"
+  | "task_when"
   | "log_system"
   | "log_school"
   | "log_module"
@@ -57,6 +60,11 @@ export interface RequestDraft {
   schoolConfirmed?: boolean;
 }
 
+export interface TaskDraft {
+  title?: string;
+  withWhom?: string;
+}
+
 export interface SupportLogDraft {
   systemId?: number;
   schoolId?: number;
@@ -72,6 +80,7 @@ export interface SessionData {
   regName?: string;
   draft?: RequestDraft;
   logDraft?: SupportLogDraft;
+  taskDraft?: TaskDraft;
   adminLogin?: string;
   /** "✏️ Tuzatish" oqimida maktab nomi yozilayotgan so'rov */
   fixRequestId?: number;

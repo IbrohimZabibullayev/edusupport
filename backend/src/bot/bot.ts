@@ -75,10 +75,19 @@ import {
   handleDueSet,
   handleReopen,
 } from "./handlers/tracking";
+import {
+  handleTaskDone,
+  handleTaskSnooze,
+  handleTaskTitle,
+  handleTaskWhen,
+  handleTaskWith,
+  showTasks,
+  startTaskWizard,
+} from "./handlers/tasks";
 import { getActiveRequestTypes, requestTypeLabel } from "./services/requestTypes";
 import { learnTopic } from "./services/topics";
 import { PrismaStorage } from "./storage";
-import { BTN_NEW_REQUEST, BTN_SUPPORT_LOG } from "./texts";
+import { BTN_NEW_REQUEST, BTN_SUPPORT_LOG, BTN_TASKS } from "./texts";
 import { MyContext, SessionData } from "./types";
 
 /** Forum guruhda xabar qaysi bo'limda (topic) yozilgan bo'lsa, o'sha bo'lim raqami */
@@ -418,10 +427,18 @@ function createBot(): Bot<MyContext> {
   bot.command("log", startLogWizard);
   bot.command("admin", cmdAdmin);
   bot.command("report", cmdReport);
+  bot.command("tasks", showTasks);
 
   // Callback tugmalar (operator tasdiqlash — adminlar uchun)
   bot.callbackQuery(/^op_(approve|reject):(\d+)$/, (ctx) =>
     handleApproveCallback(ctx, Number(ctx.match[2]), ctx.match[1] === "approve")
+  );
+
+  // Shaxsiy reja tugmalari
+  bot.callbackQuery("tsk:new", startTaskWizard);
+  bot.callbackQuery(/^tsk:done:(\d+)$/, (ctx) => handleTaskDone(ctx, Number(ctx.match[1])));
+  bot.callbackQuery(/^tsk:snooze:(\d+):(\d+)$/, (ctx) =>
+    handleTaskSnooze(ctx, Number(ctx.match[1]), Number(ctx.match[2]))
   );
 
   // Forward oqimining tugmalari
@@ -504,6 +521,12 @@ function createBot(): Bot<MyContext> {
       case "fwd_module":
       case "fwd_system":
         return remindToUseButtons(ctx);
+      case "task_title":
+        return handleTaskTitle(ctx, text);
+      case "task_with":
+        return handleTaskWith(ctx, text);
+      case "task_when":
+        return handleTaskWhen(ctx, text);
       case "fix_school_text":
         return handleFixSchoolInput(ctx, text);
       case "school_confirm":
@@ -525,6 +548,7 @@ function createBot(): Bot<MyContext> {
       default: {
         if (text === BTN_NEW_REQUEST) return startWizard(ctx);
         if (text === BTN_SUPPORT_LOG) return startLogWizard(ctx);
+        if (text === BTN_TASKS) return showTasks(ctx);
         const op = await getOperator(ctx);
         if (!op) {
           await ctx.reply("Ro'yxatdan o'tish uchun /start buyrug'ini yuboring.");

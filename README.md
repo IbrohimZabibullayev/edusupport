@@ -66,6 +66,20 @@ Bundan tashqari operatorlar **Support log** yuritadi — dasturchisiz o'zi (mijo
 
 Tartibi: **tizim → modul → markaz → muammo → prioritet → ketgan vaqt → takroriymi**.
 
+Uchinchi bo'lim — **📝 Mening rejam**: operator o'ziga vazifa qo'yadi (meeting, qo'ng'iroq), kim bilanligini va vaqtini yozadi, bot esa **belgilangan vaqtdan 5 daqiqa oldin** shaxsiy eslatma yuboradi. Tasklar faqat egasiga ko'rinadi. `/tasks` buyrug'i bilan ham ochiladi.
+
+```
+📝 Mening rejam
+Bugun
+• 14:00  Shartnoma muhokamasi — Najot Ta'lim direktori
+• 17:30  Qo'ng'iroq — Orbita
+Ertaga
+• 10:00  Demo — yangi mijoz
+[ ➕ Yangi task ]
+```
+
+Vaqt erkin yoziladi: `14:30`, `ertaga 9:00`, `indinga 11:15`, `05.08 15:00`, `05.08.2026 15:00`. Faqat soat yozilsa va u o'tib ketgan bo'lsa — ertangi kun deb olinadi.
+
 ---
 
 ## 1. Botni BotFather'da yaratish
