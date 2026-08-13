@@ -8,6 +8,8 @@ import { escapeHtml } from "../../util";
 import { menu } from "../keyboards";
 import { clientKeyOf, findClientSource } from "../services/clients";
 import { deliveryLine } from "../services/notify";
+import { sendCard } from "../services/sendCard";
+import { persistSession } from "../session";
 import { extractMedia } from "../services/content";
 import { MyContext } from "../types";
 import { getOperator, requireApprovedOperator } from "./registration";
@@ -97,7 +99,10 @@ export async function collectForAi(ctx: MyContext): Promise<void> {
     chatId,
     setTimeout(() => {
       pending.delete(chatId);
-      void flushCollected(ctx).catch((err) => console.error("AI yig'ilgan xabarni yubora olmadi:", err));
+      // Taymer yangilanish tsiklidan tashqarida ishlaydi — sessiyani o'zimiz yozamiz
+      void flushCollected(ctx)
+        .then(() => persistSession(ctx))
+        .catch((err) => console.error("AI yig'ilgan xabarni yubora olmadi:", err));
     }, COLLECT_MS)
   );
 }
@@ -192,10 +197,7 @@ async function askAi(
     // Guruhga faqat operator tugmani bosgandan keyin ketadi.
     if (result.pendings.length > 0) {
       ctx.session.aiPending = result.pendings;
-      await ctx.reply(previewAll(result.text, result.pendings), {
-        parse_mode: "HTML",
-        reply_markup: confirmKeyboard(result.pendings),
-      });
+      await showConfirm(ctx, result.text, result.pendings);
       return;
     }
 
@@ -215,6 +217,27 @@ async function askAi(
  * aynan nima yuborilishini ko'rishi kerak.
  */
 /** Tasdiq tugmalari — so'rov guruhga, xabar esa odamlarga ketadi */
+/**
+ * Tasdiq oynasini ko'rsatadi.
+ *
+ * Fayl biriktirilgan bo'lsa matn bilan birga o'sha fayllar ham qayta yuboriladi —
+ * operator guruhga aynan nima ketishini (rasm bilan qo'shib) ko'rib turishi kerak.
+ */
+async function showConfirm(ctx: MyContext, aiText: string, ps: Pending[], threadId?: number): Promise<void> {
+  const text = previewAll(aiText, ps);
+  const keyboard = confirmKeyboard(ps);
+
+  const only = ps.length === 1 ? ps[0] : undefined;
+  const media = only?.kind === "request" ? only.attachments : [];
+
+  if (media.length > 0) {
+    await sendCard(ctx.api, ctx.chat!.id, text, media.map((a) => ({ kind: a.kind, fileId: a.fileId })), threadId, keyboard);
+    return;
+  }
+
+  await ctx.reply(text, { parse_mode: "HTML", message_thread_id: threadId, reply_markup: keyboard });
+}
+
 function confirmKeyboard(ps: Pending[]): InlineKeyboard {
   const onlyMessages = ps.every((p) => p.kind === "message");
   const label = ps.length > 1 ? `✅ Hammasini yuborish (${ps.length})` : onlyMessages ? "✅ Yuborish" : "✅ Guruhga yuborish";
@@ -413,12 +436,7 @@ export async function handleGroupMention(ctx: MyContext): Promise<void> {
     // Guruhda so'rov tayyorlansa ham tasdiq shaxsiy chatdagidek tugma bilan
     if (result.pendings.length > 0) {
       ctx.session.aiPending = result.pendings;
-      await ctx.reply(previewAll(result.text, result.pendings), {
-        parse_mode: "HTML",
-        message_thread_id: msg.message_thread_id,
-        reply_parameters: { message_id: msg.message_id },
-        reply_markup: confirmKeyboard(result.pendings),
-      });
+      await showConfirm(ctx, result.text, result.pendings, msg.message_thread_id);
       return;
     }
 

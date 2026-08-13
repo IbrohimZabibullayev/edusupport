@@ -1,4 +1,4 @@
-import { Bot, InlineKeyboard, session } from "grammy";
+import { Bot, InlineKeyboard } from "grammy";
 import { config } from "../config";
 import { prisma } from "../db";
 import { SETTING_BACKLOG_CHAT, SETTING_DEV_GROUP, setSetting } from "../settings";
@@ -98,7 +98,7 @@ import {
 } from "./handlers/tasks";
 import { getActiveRequestTypes, requestTypeLabel } from "./services/requestTypes";
 import { learnTopic } from "./services/topics";
-import { PrismaStorage } from "./storage";
+import { sessionMiddleware } from "./session";
 import { BTN_NEW_REQUEST, BTN_SUPPORT_LOG, BTN_TASKS } from "./texts";
 import { MyContext, SessionData } from "./types";
 
@@ -106,21 +106,6 @@ import { MyContext, SessionData } from "./types";
 function threadOf(msg?: { is_topic_message?: boolean; message_thread_id?: number }): number | undefined {
   return msg?.is_topic_message ? msg.message_thread_id : undefined;
 }
-
-/**
- * Sessiya kaliti: shaxsiy chatda chat ID (eski yozuvlar saqlanib qolsin),
- * guruhda esa chat+foydalanuvchi — bir guruhdagi ikki odam bir-birining
- * suhbatiga tushib qolmasligi uchun.
- */
-const sessionMiddleware = session({
-  initial: (): SessionData => ({ step: "idle" }),
-  storage: new PrismaStorage<SessionData>(),
-  getSessionKey: (ctx) => {
-    if (!ctx.chat) return undefined;
-    if (ctx.chat.type === "private") return String(ctx.chat.id);
-    return ctx.from ? `${ctx.chat.id}:${ctx.from.id}` : undefined;
-  },
-});
 
 function createBot(): Bot<MyContext> {
   const bot = new Bot<MyContext>(config.botToken);
@@ -514,6 +499,13 @@ function createBot(): Bot<MyContext> {
   // Kontakt (registratsiya)
   bot.on("message:contact", handleContact);
 
+// Operator o'zi yuborgan rasm/video/fayl — forward kabi assistentga yig'iladi.
+  // Ilgari bular jimgina e'tiborsiz qolardi: skrinshot yuborilsa hech nima bo'lmasdi.
+  bot.on(["message:photo", "message:video", "message:document", "message:animation"], async (ctx, next) => {
+    if (aiAvailable() && ctx.session.step === "idle") return collectForAi(ctx);
+    await next();
+  });
+
   // Media xabarlar — izoh bosqichida biriktirma sifatida yig'iladi
   bot.on(
     [
@@ -528,8 +520,9 @@ function createBot(): Bot<MyContext> {
     handleDescMedia
   );
 
+
   // Ovozli xabar: bot uni matnga aylantira olmaydi — jim turmasdan shuni aytadi
-  bot.on(["message:voice", "message:audio"], async (ctx, next) => {
+  bot.on(["message:voice", "message:audio", "message:video_note"], async (ctx, next) => {
     if (aiAvailable() && !isForwarded(ctx.message)) return handleVoice(ctx);
     await next();
   });
