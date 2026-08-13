@@ -10,6 +10,7 @@ import {
   handleAiSend,
   handleAiText,
   handleGroupMention,
+  handleVoice,
   isGroupMention,
   resetAi,
 } from "./handlers/ai";
@@ -526,6 +527,12 @@ function createBot(): Bot<MyContext> {
     ],
     handleDescMedia
   );
+
+  // Ovozli xabar: bot uni matnga aylantira olmaydi — jim turmasdan shuni aytadi
+  bot.on(["message:voice", "message:audio"], async (ctx, next) => {
+    if (aiAvailable() && !isForwarded(ctx.message)) return handleVoice(ctx);
+    await next();
+  });
 
   // Matnli xabarlar — joriy bosqichga qarab
   bot.on("message:text", async (ctx) => {

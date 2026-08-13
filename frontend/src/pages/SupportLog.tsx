@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { ReactNode, useEffect, useMemo, useState } from "react";
 import { EmptyNote, ErrorNote, LoadingNote, PageTitle, Pagination } from "../components/ui";
 import { api } from "../lib/api";
 import { formatDate, formatMinutes } from "../lib/labels";
 import { useActivePriorities } from "../lib/priorities";
-import { ModuleItem, Operator, SupportLogsResponse, SystemItem } from "../lib/types";
+import { ModuleItem, Operator, SupportLogItem, SupportLogsResponse, SystemItem } from "../lib/types";
 
 const PAGE_SIZE = 20;
 
@@ -33,6 +33,7 @@ export default function SupportLog() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const priorities = useActivePriorities();
+  const [open, setOpen] = useState<SupportLogItem | null>(null);
 
   useEffect(() => {
     api<SystemItem[]>("/api/systems").then(setSystems).catch(() => {});
@@ -155,13 +156,20 @@ export default function SupportLog() {
               <tr><td colSpan={9}><EmptyNote text="Loglar topilmadi" /></td></tr>
             ) : (
               data.items.map((l) => (
-                <tr key={l.id} className="border-b border-grid align-top last:border-0 hover:bg-black/[0.02]">
+                <tr
+                  key={l.id}
+                  onClick={() => setOpen(l)}
+                  className="cursor-pointer border-b border-grid align-top last:border-0 hover:bg-black/[0.02]"
+                >
                   <td className="whitespace-nowrap px-3 py-3 tabular-nums text-ink-2">{formatDate(l.createdAt)}</td>
                   <td className="whitespace-nowrap px-3 py-3">{l.system ?? "—"}</td>
                   <td className="px-3 py-3">{l.school}</td>
                   <td className="whitespace-nowrap px-3 py-3">{l.moduleEmoji} {l.module}</td>
                   <td className="max-w-xs px-3 py-3 text-ink-2">
-                    <span className="line-clamp-2" title={l.problem}>{l.problem}</span>
+                    <span className="line-clamp-2">{l.problem}</span>
+                    {l.problem.length > 90 && (
+                      <span className="mt-0.5 block text-xs text-muted">to'liq ko'rish uchun bosing</span>
+                    )}
                   </td>
                   <td className="whitespace-nowrap px-3 py-3">
                     {l.priority ? (
@@ -188,6 +196,88 @@ export default function SupportLog() {
       </div>
 
       {data && <Pagination page={page} pageSize={PAGE_SIZE} total={data.total} onChange={setPage} />}
+
+      {open && <LogDetail log={open} onClose={() => setOpen(null)} />}
+    </div>
+  );
+}
+
+/**
+ * Jadvalda muammo matni ikki qatorga kesiladi — uzun izohni to'liq o'qish
+ * uchun qatorni bosganda shu panel ochiladi.
+ */
+function LogDetail({ log, onClose }: { log: SupportLogItem; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const rows: [string, ReactNode][] = [
+    ["Sana", formatDate(log.createdAt)],
+    ["Mijoz", log.school],
+    ["Tizim", log.system ?? "—"],
+    ["Modul", `${log.moduleEmoji} ${log.module}`.trim()],
+    [
+      "Daraja",
+      log.priority ? (
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: log.priorityColor ?? "#898781" }} />
+          {log.priority}
+        </span>
+      ) : (
+        "—"
+      ),
+    ],
+    ["Ketgan vaqt", formatMinutes(log.resolveMinutes)],
+    ["Takroriy", log.recurring ? "Ha" : "Yo'q"],
+    ["Kim ishladi", log.operator],
+  ];
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 p-4"
+      onClick={onClose}
+      role="presentation"
+    >
+      <div
+        className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-lg border border-line bg-surface shadow-lg"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Support log tafsiloti"
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-grid px-5 py-4">
+          <div>
+            <div className="text-sm font-medium">{log.school}</div>
+            <div className="mt-0.5 text-xs text-muted">
+              {formatDate(log.createdAt)} · {log.operator}
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-md px-2 py-1 text-sm text-muted transition-colors hover:bg-black/[0.04] hover:text-ink"
+            aria-label="Yopish"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="px-5 py-4">
+          <div className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted">Muammo</div>
+          {/* whitespace-pre-wrap — operator yozgan qatorlar saqlanadi */}
+          <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink">{log.problem}</p>
+        </div>
+
+        <dl className="grid grid-cols-2 gap-x-6 gap-y-3 border-t border-grid px-5 py-4 text-sm sm:grid-cols-3">
+          {rows.map(([label, value]) => (
+            <div key={label}>
+              <dt className="text-xs text-muted">{label}</dt>
+              <dd className="mt-0.5 text-ink">{value}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
     </div>
   );
 }

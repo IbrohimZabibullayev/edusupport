@@ -127,6 +127,25 @@ async function flushCollected(ctx: MyContext, extra?: string): Promise<void> {
   await askAi(ctx, parts.join("\n"), box.attachments, box.schoolHint);
 }
 
+/**
+ * Ovozli xabar kelganda.
+ *
+ * Bot ovozni matnga aylantira olmaydi (Claude audio qabul qilmaydi, alohida
+ * xizmat ulanmagan). Jim turgandan ko'ra rostini aytgan yaxshi — aks holda
+ * operator xabari yo'qolgandek tuyuladi.
+ */
+export async function handleVoice(ctx: MyContext): Promise<void> {
+  if (ctx.session.step !== "idle") return;
+  const op = await getOperator(ctx);
+  if (!op || op.status !== "APPROVED") return;
+
+  await ctx.reply(
+    "🎤 Ovozli xabarni hozircha tushunmayman — matn qilib yozib yuboring.\n" +
+      "Mijozning ovozli xabari bo'lsa, uning mazmunini qisqacha yozsangiz kifoya.",
+    { reply_markup: menu() }
+  );
+}
+
 /** Operator oddiy matn yozganda */
 export async function handleAiText(ctx: MyContext, text: string): Promise<void> {
   // Forward yig'ilib turgan bo'lsa — bu matn o'sha murojaatning izohi
