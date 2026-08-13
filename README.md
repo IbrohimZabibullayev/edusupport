@@ -7,7 +7,87 @@ Ta'lim ERP kompaniyasi uchun support-tracking tizimi:
 
 Operatorlar bot orqali so'rov (bug / muammo-savol / taklif) kiritadi, buglar dev guruhga avtomatik yo'naltiriladi, admin panelda statistika ko'rinadi.
 
-**So'rov kiritishning ikki yo'li bor:**
+## 🤖 Assistent rejimi (asosiy usul)
+
+`ANTHROPIC_API_KEY` berilgan bo'lsa bot **tugmasiz** ishlaydi: operator oddiy xabar yozadi, bot o'zi tushunib kerakli ishni bajaradi.
+
+```
+👤 eduschoolda Farobiy Schoolda moliyada o'qituvchi maoshini
+   chiqarishda muammo bo'lyabti
+
+🤖 Tayyorladim: Farobiy School, Moliya moduli, Bug.
+   ━━━━━━━━━━━━━━━━
+   🐞 Bug
+   🖥 Tizim: EduSchool
+   🧩 Modul: Moliya (to'lovlar)
+   🏫 Maktab: Farobiy School
+   💬 O'qituvchi maoshini chiqarishda xatolik
+   ━━━━━━━━━━━━━━━━
+   [ ✅ Guruhga yuborish ]  [ ❌ Bekor qilish ]
+```
+
+Bir gapdan tizim, maktab, modul va so'rov turi ajratib olinadi.
+
+**Guruhga tasdiqsiz hech narsa ketmaydi.** Assistent so'rovni faqat *tayyorlaydi* — aynan nima yuborilishini ko'rasiz va tugmani bosgandan keyingina dasturchilarga tushadi. Noto'g'ri tushunilgan xabar guruhni bezovta qilmaydi.
+
+### Forward: yig'adi → so'raydi → xulosa yozadi
+
+```
+📨 "Assalomu alaykum akalar yaxshimisizlar"
+📨 "CRM dagi ma'lumotlar EduTizimga ba'zilari o'tib ba'zilari o'tmayapti"
+📨 "04.07.2026 14:43 da 91-496-7177 raqamli lid o'tkazilgan, 18 soat o'tdi"
+
+💬 bu Najot Ta'limdan, lidlar moduli
+
+🤖 Tayyorladim: Najot Ta'lim, Lidlar (CRM), Bug —
+   CRM'dan Edu Tizimga lidlar to'liq o'tmayapti. Tasdiqlaysizmi?
+```
+
+Ketma-ket forwardlar **birga yig'iladi** (oxirgisidan 4 soniya kutiladi yoki siz izoh yozguningizcha), keyin assistent hammasidan bitta **xulosa** yozadi. Salomlashuv tushib qoladi, lekin telefon, sana va ID kabi aniq ma'lumotlar aynan saqlanadi. Kartada xulosa ham, mijozning asl matni ham bo'ladi.
+
+### Noaniq bo'lsa — so'raydi, to'qimaydi
+
+| Holat | Bot nima qiladi |
+|---|---|
+| «moliya bilan bog'liq bir gap bor edi» | so'rovmi yoki support logmi — so'raydi |
+| «hal qilib berdim» (vaqt aytilmagan) | «qancha vaqt ketdi va takroriymi?» deb so'raydi |
+| maktab bazada yo'q | yangi ochmaydi — avval ruxsat so'raydi |
+| bir nechta o'xshash maktab | qaysi biri ekanini so'raydi |
+
+Ketgan vaqt, takroriylik yoki maktab nomi **hech qachon to'qilmaydi**.
+
+**Nimalar qila oladi:**
+
+| Yozasiz | Bajaradi |
+|---|---|
+| «Najot Ta'limda jurnal ochilmayapti» | so'rov tayyorlaydi → tasdiqdan keyin guruhga |
+| «o'zim tuzatdim, 25 daqiqa ketdi» | support log yozadi (guruhga ketmaydi) |
+| «bugun 14:00 da meetingim bor, 5 daqiqa oldin eslat» | vazifa qo'yadi va eslatadi |
+| «Feruzaga ertaga 10:00 ga hisobotni topshir» | topshiriq beradi va unga xabar yuboradi |
+| «qilinmagan vazifalar nechta?» | hisobot beradi |
+| «shu hafta kim nechta so'rov qilgan?» | operatorlar kesimida statistika |
+
+`/yangi` — suhbatni tozalash. Suhbat 30 daqiqa jimlikdan keyin o'zi tozalanadi.
+
+### Model va xarajat
+
+**Claude Sonnet 5**, `effort: low`. Uchta variant bir xil 10 ta qiyin holatda o'lchandi:
+
+| Variant | To'g'ri | Tezlik | 300 xabar/kun oyiga |
+|---|---|---|---|
+| **Sonnet 5 · low** ← tanlangan | **10/10** | ~7s | **~$76** |
+| Sonnet 5 · medium | 10/10 | ~8s | ~$90 |
+| Haiku 4.5 | 9/10 | ~3s | ~$57 |
+
+Haiku arzonroq va tezroq, lekin eng oddiy holatda (maktab + modul ajratish) so'rov yaratmadi. Bundan tashqari uning prompt-kesh minimumi 4096 token — bizda prefiks ~2900, ya'ni kesh umuman ishlamaydi va narx afzalligi kutilganidan kam.
+
+**Prompt keshlash yoqilgan** — tizim prompti va tool sxemalari (~2900 token) har chaqiruvda 0.1x narxda o'qiladi. Bu xarajatni ~3 baravar kamaytiradi.
+
+Modelni almashtirish uchun `backend/src/ai/client.ts` dagi ikki qatorni o'zgartirasiz.
+
+> Kalit berilmagan bo'lsa assistent o'chadi va bot eski tugmali rejimda ishlayveradi — boshqa hech narsa buzilmaydi.
+
+### Tugmali rejim (zaxira)
 
 | | Qadamlar | Qachon |
 |---|---|---|
@@ -185,6 +265,9 @@ JWT_SECRET=juda-uzun-tasodifiy-satr
 DEV_GROUP_ID=-1001234567890
 BACKLOG_CHAT_ID=
 PORT=3000
+
+# Assistent rejimi uchun (ixtiyoriy — berilmasa bot tugmali rejimda ishlaydi)
+ANTHROPIC_API_KEY=sk-ant-...
 ```
 
 ### Frontend

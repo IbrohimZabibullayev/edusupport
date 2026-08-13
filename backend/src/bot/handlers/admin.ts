@@ -1,7 +1,7 @@
 import { config } from "../../config";
 import { prisma } from "../../db";
 import { safeEquals } from "../../util";
-import { mainMenu } from "../keyboards";
+import { menu } from "../keyboards";
 import { buildOnDemandReport } from "../services/report";
 import { MyContext } from "../types";
 import { getOperator } from "./registration";
@@ -59,7 +59,7 @@ export async function handleAdminPassword(ctx: MyContext, password: string): Pro
       "• /report bilan istalgan payt hisobot olasiz,",
       "• har dushanba 09:00 da avtomatik haftalik hisobot olasiz.",
     ].join("\n"),
-    { reply_markup: mainMenu }
+    { reply_markup: menu() }
   );
 }
 

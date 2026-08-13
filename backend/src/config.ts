@@ -15,6 +15,8 @@ export const config = {
   adminLogin: required("ADMIN_LOGIN"),
   adminPassword: required("ADMIN_PASSWORD"),
   jwtSecret: required("JWT_SECRET"),
+  /** Bo'sh bo'lsa AI o'chadi va bot eski tugmali rejimda ishlayveradi */
+  anthropicApiKey: process.env.ANTHROPIC_API_KEY || "",
   devGroupId: process.env.DEV_GROUP_ID || "",
   backlogChatId: process.env.BACKLOG_CHAT_ID || "",
   port: Number(process.env.PORT) || 3000,

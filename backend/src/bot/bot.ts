@@ -3,6 +3,7 @@ import { config } from "../config";
 import { prisma } from "../db";
 import { SETTING_BACKLOG_CHAT, SETTING_DEV_GROUP, setSetting } from "../settings";
 import { ticketId } from "../util";
+import { aiAvailable, collectForAi, handleAiCancel, handleAiSend, handleAiText, resetAi } from "./handlers/ai";
 import { cmdAdmin, cmdReport, handleAdminLogin, handleAdminPassword } from "./handlers/admin";
 import {
   cancelForward,
@@ -38,6 +39,7 @@ import {
   handleSchoolConfirmNew,
   handleSchoolConfirmPick,
   handleSchoolConfirmText,
+  handleSchoolList,
 } from "./handlers/schoolPick";
 import {
   getOperator,
@@ -415,6 +417,11 @@ function createBot(): Bot<MyContext> {
   bot.on("message", async (ctx, next) => {
     const step = ctx.session.step;
     if (isForwarded(ctx.message) && (step === "idle" || inForwardFlow(step))) {
+      // Assistent yoqilgan bo'lsa forward ham unga boradi — savol-javobsiz
+      if (aiAvailable() && step === "idle") {
+        await collectForAi(ctx);
+        return;
+      }
       await handleForward(ctx);
       return;
     }
@@ -428,11 +435,18 @@ function createBot(): Bot<MyContext> {
   bot.command("admin", cmdAdmin);
   bot.command("report", cmdReport);
   bot.command("tasks", showTasks);
+  // Assistent suhbatini tozalash
+  bot.command("yangi", resetAi);
+  bot.command("reset", resetAi);
 
   // Callback tugmalar (operator tasdiqlash — adminlar uchun)
   bot.callbackQuery(/^op_(approve|reject):(\d+)$/, (ctx) =>
     handleApproveCallback(ctx, Number(ctx.match[2]), ctx.match[1] === "approve")
   );
+
+  // Assistent tayyorlagan so'rovni tasdiqlash
+  bot.callbackQuery("ai:send", handleAiSend);
+  bot.callbackQuery("ai:cancel", handleAiCancel);
 
   // Shaxsiy reja tugmalari
   bot.callbackQuery("tsk:new", startTaskWizard);
@@ -452,6 +466,7 @@ function createBot(): Bot<MyContext> {
   // /new va /log wizardlaridagi maktab tasdig'i (dublikat himoyasi)
   bot.callbackQuery(/^sch:pick:(\d+)$/, (ctx) => handleSchoolConfirmPick(ctx, Number(ctx.match[1])));
   bot.callbackQuery("sch:new", handleSchoolConfirmNew);
+  bot.callbackQuery("sch:list", handleSchoolList);
   bot.callbackQuery(/^fwd:sys:(\d+)$/, (ctx) => handleFwdSystem(ctx, Number(ctx.match[1])));
   bot.callbackQuery(/^fwd:type:(.+)$/, (ctx) => handleFwdType(ctx, ctx.match[1]));
   bot.callbackQuery(/^fwd:mod:(\d+)$/, (ctx) => handleFwdModule(ctx, Number(ctx.match[1])));
@@ -553,6 +568,8 @@ function createBot(): Bot<MyContext> {
         if (!op) {
           await ctx.reply("Ro'yxatdan o'tish uchun /start buyrug'ini yuboring.");
         } else if (op.status === "APPROVED") {
+          // Oddiy matn — assistentga. U o'zi tushunib kerakli ishni qiladi.
+          if (aiAvailable()) return handleAiText(ctx, text);
           await ctx.reply(
             [
               "📩 Mijozning xabarini shu yerga forward qilsangiz — so'rov o'zi shakllanadi (eng tez yo'l).",

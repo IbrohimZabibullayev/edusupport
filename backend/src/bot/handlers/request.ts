@@ -4,7 +4,7 @@ import {
   buildModuleKeyboard,
   buildSystemKeyboard,
   buildTypeKeyboard,
-  mainMenu,
+  menu,
 } from "../keyboards";
 import { extractMedia } from "../services/content";
 import { createRequestFromDraft } from "../services/createRequest";
@@ -55,7 +55,7 @@ export async function handleSystemStep(ctx: MyContext, text: string): Promise<vo
 async function cancelWizard(ctx: MyContext): Promise<void> {
   ctx.session.step = "idle";
   ctx.session.draft = undefined;
-  await ctx.reply("❌ So'rov kiritish bekor qilindi.", { reply_markup: mainMenu });
+  await ctx.reply("❌ So'rov kiritish bekor qilindi.", { reply_markup: menu() });
 }
 
 export async function handleTypeStep(ctx: MyContext, text: string): Promise<void> {
@@ -151,7 +151,7 @@ async function submitRequest(ctx: MyContext): Promise<void> {
   if (!draft?.type || !draft.moduleId || !draft.schoolId) {
     ctx.session.step = "idle";
     ctx.session.draft = undefined;
-    await ctx.reply("Nimadir xato ketdi. Iltimos, /new bilan qaytadan boshlang.", { reply_markup: mainMenu });
+    await ctx.reply("Nimadir xato ketdi. Iltimos, /new bilan qaytadan boshlang.", { reply_markup: menu() });
     return;
   }
 
@@ -177,6 +177,6 @@ async function submitRequest(ctx: MyContext): Promise<void> {
       `Maktab: ${escapeHtml(request.school.name)}`,
       ...(attachments.length > 0 ? [`📎 Biriktirilgan fayllar: ${attachments.length} ta`] : []),
     ].join("\n"),
-    { parse_mode: "HTML", reply_markup: mainMenu }
+    { parse_mode: "HTML", reply_markup: menu() }
   );
 }

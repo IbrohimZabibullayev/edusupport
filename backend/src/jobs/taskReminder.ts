@@ -4,8 +4,8 @@ import { prisma } from "../db";
 import { MyContext } from "../bot/types";
 import { escapeHtml, formatTashkentTime } from "../util";
 
-/** Belgilangan vaqtdan shuncha oldin eslatiladi */
-const LEAD_MS = 5 * 60_000;
+/** Eng uzoq eslatma oralig'i — shuncha oldinga qaraymiz, keyin har taskni o'zi bo'yicha tekshiramiz */
+const MAX_LEAD_MS = 24 * 60 * 60_000;
 /** Bundan ham eskirib ketgan taskka eslatma yuborilmaydi (bot to'xtab qolgan bo'lsa) */
 const STALE_MS = 30 * 60_000;
 
@@ -15,15 +15,18 @@ const STALE_MS = 30 * 60_000;
  */
 export async function sendTaskReminders(bot: Bot<MyContext>): Promise<number> {
   const now = new Date();
-  const due = await prisma.operatorTask.findMany({
+  const candidates = await prisma.operatorTask.findMany({
     where: {
       done: false,
       remindedAt: null,
-      dueAt: { lte: new Date(now.getTime() + LEAD_MS), gte: new Date(now.getTime() - STALE_MS) },
+      dueAt: { lte: new Date(now.getTime() + MAX_LEAD_MS), gte: new Date(now.getTime() - STALE_MS) },
     },
     include: { operator: true },
     orderBy: { dueAt: "asc" },
   });
+
+  // Har taskning o'z eslatma oralig'i bor (standart 5 daqiqa)
+  const due = candidates.filter((t) => t.dueAt.getTime() - now.getTime() <= t.remindLeadMin * 60_000);
 
   let sent = 0;
   for (const t of due) {

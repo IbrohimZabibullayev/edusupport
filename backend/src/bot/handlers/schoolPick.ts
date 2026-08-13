@@ -3,7 +3,7 @@ import { escapeHtml } from "../../util";
 import { backCancelKeyboard, submitKeyboard } from "../keyboards";
 
 import { notifyAdmins } from "../services/notify";
-import { createSchool, matchSchool } from "../services/schools";
+import { createSchool, popularSchools, schoolCandidates } from "../services/schools";
 import { ASK_DESC, ASK_LOG_PROBLEM } from "../texts";
 import { MyContext, SchoolFlow } from "../types";
 import { requireApprovedOperator } from "./registration";
@@ -24,33 +24,59 @@ export async function resolveSchoolOrAsk(ctx: MyContext, text: string, flow: Sch
     return;
   }
   const name = text.trim();
-  const match = await matchSchool(name);
+  const found = await schoolCandidates(name);
 
-  if (match.kind === "exact") {
-    await continueAfterSchool(ctx, flow, match.school.id);
-    return;
-  }
+  // Bot hech qachon o'zi tanlamaydi — hatto aynan mos kelsa ham tasdiqlatamiz.
+  // Dublikatlarning asosiy sababi shu edi: yozadi, bot jimgina yangi ochadi.
+  ctx.session.schoolAsk = { flow, name, ids: found.map((s) => s.id) };
+  ctx.session.step = "school_confirm";
 
-  if (match.kind === "similar") {
-    ctx.session.schoolAsk = { flow, name, ids: match.schools.map((s) => s.id) };
-    ctx.session.step = "school_confirm";
-    const kb = new InlineKeyboard();
-    for (const s of match.schools) kb.text(`✅ ${s.name}`, `sch:pick:${s.id}`).row();
-    kb.text(`➕ Yangi maktab: ${name}`, "sch:new");
+  if (found.length === 0) {
     await ctx.reply(
-      [
-        `Siz yozdingiz: <b>${escapeHtml(name)}</b>`,
-        "",
-        match.schools.length > 1
-          ? "Bazada shunga o'xshash maktablar bor. Qaysi biri?"
-          : "Bazada shunga o'xshash maktab bor. Shumi?",
-      ].join("\n"),
-      { parse_mode: "HTML", reply_markup: kb }
+      [`<b>${escapeHtml(name)}</b> bazada topilmadi.`, "", "Yangi qilib qo'shaymi yoki ro'yxatdan tanlaysizmi?"].join("\n"),
+      {
+        parse_mode: "HTML",
+        reply_markup: new InlineKeyboard()
+          .text(`➕ Yangi: ${name}`, "sch:new")
+          .row()
+          .text("🔍 Ro'yxatdan tanlash", "sch:list"),
+      }
     );
     return;
   }
 
-  await continueAfterSchool(ctx, flow, await createAndAnnounce(ctx, name));
+  const kb = new InlineKeyboard();
+  for (const s of found) kb.text(s.name, `sch:pick:${s.id}`).row();
+  kb.text(`➕ Yangi: ${name}`, "sch:new").row().text("🔍 Boshqa maktablar", "sch:list");
+  await ctx.reply(
+    [`Siz yozdingiz: <b>${escapeHtml(name)}</b>`, "", "Shulardan birimi yoki yangimi?"].join("\n"),
+    { parse_mode: "HTML", reply_markup: kb }
+  );
+}
+
+/** "Ro'yxatdan tanlash" — eng ko'p ishlatilgan maktablarni tugma qilib beramiz */
+export async function handleSchoolList(ctx: MyContext): Promise<void> {
+  const ask = ctx.session.schoolAsk;
+  if (!ask) {
+    await ctx.answerCallbackQuery({ text: "Bu savol eskirgan", show_alert: true });
+    return;
+  }
+  const schools = await popularSchools();
+  await ctx.answerCallbackQuery();
+  if (schools.length === 0) {
+    await ctx.editMessageText("Bazada maktab yo'q — nomini yozing.");
+    ctx.session.step = ask.flow === "req" ? "req_school" : "log_school";
+    return;
+  }
+  const kb = new InlineKeyboard();
+  for (let i = 0; i < schools.length; i += 2) {
+    kb.text(schools[i].name, `sch:pick:${schools[i].id}`);
+    if (schools[i + 1]) kb.text(schools[i + 1].name, `sch:pick:${schools[i + 1].id}`);
+    kb.row();
+  }
+  kb.text(`➕ Yangi: ${ask.name}`, "sch:new");
+  ctx.session.schoolAsk = { ...ask, ids: schools.map((s) => s.id) };
+  await ctx.editMessageText("Ro'yxatdan tanlang yoki qaytadan nom yozing:", { reply_markup: kb });
 }
 
 async function createAndAnnounce(ctx: MyContext, name: string): Promise<number> {

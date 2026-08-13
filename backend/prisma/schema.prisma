@@ -114,6 +114,10 @@ model OperatorTask {
   doneAt     DateTime?
   /** Eslatma yuborilgan payt — bir marta eslatish uchun */
   remindedAt DateTime?
+  /** Vaqtidan necha daqiqa oldin eslatilsin */
+  remindLeadMin  Int     @default(5)
+  /** Topshiriqni kim bergani — o'zi qo'ygan bo'lsa bo'sh */
+  assignedByName String?
   createdAt  DateTime  @default(now())
 
   @@index([operatorId, dueAt])

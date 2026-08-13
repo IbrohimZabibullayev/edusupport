@@ -1,3 +1,4 @@
+import { aiEnabled } from "../ai/client";
 import { InlineKeyboard, Keyboard } from "grammy";
 import { moduleLabel } from "./services/modules";
 import { requestTypeLabel } from "./services/requestTypes";
@@ -10,6 +11,17 @@ export const mainMenu = new Keyboard()
   .text(BTN_TASKS)
   .resized()
   .persistent();
+
+/**
+ * Pastdagi tugmalar qatori.
+ *
+ * Assistent yoqilgan bo'lsa tugmalar kerak emas — operator shunchaki yozadi,
+ * shuning uchun klaviatura yig'ishtiriladi. Assistent o'chiq bo'lsa (kalit yo'q
+ * yoki xato) eski tugmali rejim qaytadi.
+ */
+export function menu(): Keyboard | { remove_keyboard: true } {
+  return aiEnabled() ? { remove_keyboard: true } : mainMenu;
+}
 
 export const contactKeyboard = new Keyboard()
   .requestContact("📱 Raqamni yuborish")

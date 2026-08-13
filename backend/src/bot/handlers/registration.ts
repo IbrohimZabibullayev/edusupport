@@ -1,7 +1,7 @@
 import { Operator } from "@prisma/client";
 import { prisma } from "../../db";
 import { escapeHtml } from "../../util";
-import { approvalKeyboard, contactKeyboard, mainMenu } from "../keyboards";
+import { approvalKeyboard, contactKeyboard, menu } from "../keyboards";
 import { notifyAdmins } from "../services/notify";
 import { MyContext } from "../types";
 
@@ -65,7 +65,7 @@ export async function handleStart(ctx: MyContext): Promise<void> {
           "",
           "To'liq shakl kerak bo'lsa pastdagi tugmadan foydalaning.",
         ].join("\n"),
-        { parse_mode: "HTML", reply_markup: mainMenu }
+        { parse_mode: "HTML", reply_markup: menu() }
       );
       break;
   }
@@ -156,7 +156,7 @@ export async function handleApproveCallback(ctx: MyContext, operatorId: number, 
       await ctx.api.sendMessage(
         op.telegramId,
         "🎉 Tabriklaymiz! Admin sizni tasdiqladi. Endi so'rov kiritishingiz mumkin.",
-        { reply_markup: mainMenu }
+        { reply_markup: menu() }
       );
     } else {
       await ctx.api.sendMessage(op.telegramId, "❌ Afsuski, so'rovingiz rad etildi.");

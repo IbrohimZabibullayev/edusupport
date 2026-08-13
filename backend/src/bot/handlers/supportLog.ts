@@ -5,7 +5,7 @@ import {
   buildModuleKeyboard,
   buildPriorityKeyboard,
   buildSystemKeyboard,
-  mainMenu,
+  menu,
   yesNoKeyboard,
 } from "../keyboards";
 import { getActiveModules, moduleLabel } from "../services/modules";
@@ -47,7 +47,7 @@ export async function startLogWizard(ctx: MyContext): Promise<void> {
 async function cancel(ctx: MyContext): Promise<void> {
   ctx.session.step = "idle";
   ctx.session.logDraft = undefined;
-  await ctx.reply("❌ Support log bekor qilindi.", { reply_markup: mainMenu });
+  await ctx.reply("❌ Support log bekor qilindi.", { reply_markup: menu() });
 }
 
 export async function handleLogSystem(ctx: MyContext, text: string): Promise<void> {
@@ -182,7 +182,7 @@ async function submitLog(ctx: MyContext): Promise<void> {
   if (!d?.schoolId || !d.moduleId || !d.problem || d.resolveMinutes === undefined) {
     ctx.session.step = "idle";
     ctx.session.logDraft = undefined;
-    await ctx.reply("Nimadir xato ketdi. Iltimos, qaytadan boshlang.", { reply_markup: mainMenu });
+    await ctx.reply("Nimadir xato ketdi. Iltimos, qaytadan boshlang.", { reply_markup: menu() });
     return;
   }
 
@@ -216,6 +216,6 @@ async function submitLog(ctx: MyContext): Promise<void> {
       "",
       `📝 ${escapeHtml(log.problem)}`,
     ].join("\n"),
-    { parse_mode: "HTML", reply_markup: mainMenu }
+    { parse_mode: "HTML", reply_markup: menu() }
   );
 }

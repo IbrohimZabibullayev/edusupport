@@ -7,7 +7,7 @@ import {
   parseWhenTashkent,
   tashkentDayStart,
 } from "../../util";
-import { backCancelKeyboard, mainMenu } from "../keyboards";
+import { backCancelKeyboard, menu } from "../keyboards";
 import { BTN_BACK, BTN_CANCEL } from "../texts";
 import { MyContext } from "../types";
 import { requireApprovedOperator } from "./registration";
@@ -100,7 +100,7 @@ export async function startTaskWizard(ctx: MyContext): Promise<void> {
 async function cancel(ctx: MyContext): Promise<void> {
   ctx.session.step = "idle";
   ctx.session.taskDraft = undefined;
-  await ctx.reply("❌ Bekor qilindi.", { reply_markup: mainMenu });
+  await ctx.reply("❌ Bekor qilindi.", { reply_markup: menu() });
 }
 
 export async function handleTaskTitle(ctx: MyContext, text: string): Promise<void> {
@@ -169,7 +169,7 @@ export async function handleTaskWhen(ctx: MyContext, text: string): Promise<void
       "",
       past ? "<i>Vaqt o'tib ketgan — eslatma bo'lmaydi.</i>" : "<i>5 daqiqa oldin eslatib turaman.</i>",
     ].join("\n"),
-    { parse_mode: "HTML", reply_markup: mainMenu }
+    { parse_mode: "HTML", reply_markup: menu() }
   );
 }
 

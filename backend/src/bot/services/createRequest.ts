@@ -31,11 +31,7 @@ export async function createRequestFromDraft(api: Api, op: Operator, draft: Requ
     include: { school: true, module: true, system: true },
   });
 
-  const delivery = await routeRequest(
-    api,
-    request.id,
-    attachments.map((a) => ({ chatId: a.chatId, messageId: a.messageId }))
-  );
+  const delivery = await routeRequest(api, request.id);
 
   return { ...request, delivery };
 }

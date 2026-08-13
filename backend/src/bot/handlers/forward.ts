@@ -10,7 +10,7 @@ import { guessFromText } from "../services/guess";
 import { getActiveModules, moduleLabel } from "../services/modules";
 import { deliveryLine, notifyAdmins } from "../services/notify";
 import { getActiveRequestTypes, requestTypeLabelByKey } from "../services/requestTypes";
-import { createSchool, matchSchool } from "../services/schools";
+import { createSchool, popularSchools, schoolCandidates } from "../services/schools";
 import { getActiveSystems } from "../services/systems";
 import { MyContext, RequestDraft, Step } from "../types";
 import { requireApprovedOperator } from "./registration";
@@ -434,46 +434,28 @@ export async function handleFwdSchoolText(ctx: MyContext, text: string): Promise
   const op = await requireApprovedOperator(ctx);
   if (!op) return;
 
-  const match = await matchSchool(text);
-  if (match.kind === "exact") {
-    draft.schoolId = match.school.id;
-    draft.schoolConfirmed = true;
-    ctx.session.draft = draft;
-    await continueFlow(ctx, draft);
-    return;
-  }
-  if (match.kind === "similar") {
-    // Dublikat yaratmaslik uchun avval so'raymiz
-    draft.pendingSchoolName = text;
-    draft.similarSchoolIds = match.schools.map((s) => s.id);
-    draft.promptMessageId = undefined; // yangi xabar bilan so'raymiz
-    ctx.session.draft = draft;
-    ctx.session.step = "fwd_school_confirm";
-    const kb = new InlineKeyboard();
-    for (const s of match.schools) kb.text(`✅ ${s.name}`, `fwd:samesch:${s.id}`).row();
-    kb.text(`➕ Yangi maktab: ${text}`, "fwd:newsch");
-    await ctx.reply(
-      [
-        `Siz yozdingiz: <b>${escapeHtml(text)}</b>`,
-        "",
-        match.schools.length > 1
-          ? "Bazada shunga o'xshash maktablar bor. Qaysi biri?"
-          : "Bazada shunga o'xshash maktab bor. Shumi?",
-      ].join("\n"),
-      { parse_mode: "HTML", reply_markup: kb }
-    );
-    return;
-  }
+  // Bot hech qachon o'zi tanlamaydi — aynan mos kelsa ham ro'yxat ko'rsatiladi.
+  // Topilmasa esa yangi maktab jimgina ochilmaydi.
+  const found = await schoolCandidates(text);
+  const own = await recentSchools(op.id);
+  const options = found.length > 0 ? found : own.length > 0 ? own : await popularSchools(6);
 
-  const school = await createSchool(text, op.id);
-  await notifyAdmins(
-    ctx.api,
-    `🏫 <b>Yangi maktab qo'shildi:</b> ${escapeHtml(school.name)}\n👤 Operator: ${escapeHtml(op.fullName)}`
-  );
-  draft.schoolId = school.id;
-  draft.schoolConfirmed = true;
+  draft.pendingSchoolName = text;
+  draft.similarSchoolIds = options.map((s) => s.id);
+  draft.promptMessageId = undefined; // yangi xabar bilan so'raymiz
   ctx.session.draft = draft;
-  await continueFlow(ctx, draft);
+  ctx.session.step = "fwd_school_confirm";
+
+  const kb = new InlineKeyboard();
+  for (const s of options) kb.text(s.name, `fwd:samesch:${s.id}`).row();
+  kb.text(`➕ Yangi: ${text}`, "fwd:newsch");
+
+  await ctx.reply(
+    found.length > 0
+      ? [`Siz yozdingiz: <b>${escapeHtml(text)}</b>`, "", "Shulardan birimi yoki yangimi?"].join("\n")
+      : [`<b>${escapeHtml(text)}</b> bazada topilmadi.`, "", "Yangi qilib qo'shaymi yoki quyidagilardan birimi?"].join("\n"),
+    { parse_mode: "HTML", reply_markup: kb }
+  );
 }
 
 /* ---------- Yuborish ---------- */

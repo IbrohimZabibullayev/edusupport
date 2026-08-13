@@ -75,17 +75,33 @@ export function cardKeyboard(r: Pick<Request, "id" | "done" | "assigneeTgId">): 
     .text("👤 Boshqaga berish", `rq:assign:${r.id}`);
 }
 
-/** Guruhda turgan kartani bazadagi holatga qarab qayta chizadi */
+/**
+ * Guruhda turgan kartani bazadagi holatga qarab qayta chizadi.
+ *
+ * Karta media izohi (caption) bo'lishi ham mumkin — matn va media bitta xabarga
+ * birlashtirilganda shunday bo'ladi. Telegram bunday xabarni editMessageText
+ * bilan tahrirlamaydi, shuning uchun editMessageCaption ga tushamiz.
+ */
 export async function refreshCard(api: Api, requestId: number): Promise<void> {
   const r = await prisma.request.findUnique({ where: { id: requestId }, include: cardInclude });
   if (!r || !r.cardChatId || !r.cardMessageId) return;
+  const text = await renderCardText(r);
+  const markup = cardKeyboard(r);
   try {
-    await api.editMessageText(r.cardChatId, r.cardMessageId, await renderCardText(r), {
+    await api.editMessageText(r.cardChatId, r.cardMessageId, text, {
       parse_mode: "HTML",
-      reply_markup: cardKeyboard(r),
+      reply_markup: markup,
       link_preview_options: { is_disabled: true },
     });
   } catch (err) {
-    console.error(`${ticketId(r.ticketNumber)} kartasi yangilanmadi:`, err);
+    try {
+      await api.editMessageCaption(r.cardChatId, r.cardMessageId, {
+        caption: text,
+        parse_mode: "HTML",
+        reply_markup: markup,
+      });
+    } catch {
+      console.error(`${ticketId(r.ticketNumber)} kartasi yangilanmadi:`, err);
+    }
   }
 }

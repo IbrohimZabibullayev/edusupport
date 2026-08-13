@@ -75,12 +75,25 @@ export interface SupportLogDraft {
   recurring?: boolean;
 }
 
+export interface AiBox {
+  texts: string[];
+  attachments: DraftAttachment[];
+  clientLabel?: string;
+  schoolHint?: number;
+}
+
 export interface SessionData {
   step: Step;
   regName?: string;
   draft?: RequestDraft;
   logDraft?: SupportLogDraft;
   taskDraft?: TaskDraft;
+  /** Assistent suhbati — TTL bilan, eskirsa tashlanadi */
+  ai?: { history: unknown[]; lastAt: number };
+  /** Forward qilingan xabarlar assistentga berilgunicha shu yerda yig'iladi */
+  aiBox?: AiBox;
+  /** Tasdiq kutayotgan so'rov qoralamasi */
+  aiPending?: unknown;
   adminLogin?: string;
   /** "✏️ Tuzatish" oqimida maktab nomi yozilayotgan so'rov */
   fixRequestId?: number;
