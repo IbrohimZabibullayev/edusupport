@@ -10,7 +10,7 @@ import { clientKeyOf, findClientSource } from "../services/clients";
 import { deliveryLine } from "../services/notify";
 import { extractMedia } from "../services/content";
 import { MyContext } from "../types";
-import { requireApprovedOperator } from "./registration";
+import { getOperator, requireApprovedOperator } from "./registration";
 
 /**
  * Assistent rejimi: operator oddiy xabar yozadi, bot o'zi tushunib ish qiladi.
@@ -247,6 +247,108 @@ export async function handleAiCancel(ctx: MyContext): Promise<void> {
   await ctx.answerCallbackQuery({ text: "Bekor qilindi" });
   await ctx.editMessageReplyMarkup({ reply_markup: undefined }).catch(() => undefined);
   await ctx.reply("❌ Yuborilmadi. Nimani o'zgartiray?", { reply_markup: menu() });
+}
+
+/**
+ * Guruhda assistentga murojaat qilinganmi.
+ *
+ * Uch yo'l bor: nomi bilan chaqirish ("girgitton ..."), bot xabariga reply
+ * qilish, yoki @username bilan tag qilish. Boshqa guruh xabarlariga bot
+ * aralashmaydi — aks holda har gapga javob berib chiqadi.
+ */
+const WAKE_WORD = /(^|\s|[",.!?])girgitton\b/i;
+
+export function isGroupMention(ctx: MyContext): boolean {
+  const msg = ctx.message;
+  if (!msg || !ctx.chat || ctx.chat.type === "private") return false;
+
+  const text = msg.text ?? msg.caption ?? "";
+  if (WAKE_WORD.test(text)) return true;
+
+  const me = ctx.me?.username;
+  if (me && new RegExp(`@${me}\\b`, "i").test(text)) return true;
+
+  // Botning o'z xabariga reply — suhbat davomi
+  return msg.reply_to_message?.from?.id === ctx.me?.id;
+}
+
+/**
+ * Guruhdagi murojaatga javob beradi.
+ *
+ * Guruhda suhbat tarixi saqlanmaydi — har murojaat mustaqil. Uzluksizlik
+ * reply orqali beriladi: javob berilayotgan xabar matni kontekst sifatida
+ * qo'shiladi, shuning uchun "girgitton bu bajarildimi?" kabi savollar ham
+ * tushunarli bo'ladi.
+ */
+export async function handleGroupMention(ctx: MyContext): Promise<void> {
+  const msg = ctx.message;
+  if (!msg) return;
+
+  const op = await getOperator(ctx);
+  if (!op || op.status !== "APPROVED") {
+    await ctx.reply("Sizni tanimadim. Avval botga shaxsiy yozib /start orqali ro'yxatdan o'ting.", {
+      message_thread_id: msg.message_thread_id,
+      reply_parameters: { message_id: msg.message_id },
+    });
+    return;
+  }
+
+  const raw = (msg.text ?? msg.caption ?? "").replace(WAKE_WORD, " ").trim();
+  if (raw.length === 0) {
+    await ctx.reply("Labbay? Nima kerak edi?", {
+      message_thread_id: msg.message_thread_id,
+      reply_parameters: { message_id: msg.message_id },
+    });
+    return;
+  }
+
+  const parts: string[] = [`[GURUH] ${op.fullName} guruhda yozdi:`, raw];
+
+  // Reply qilingan xabar — kontekst
+  const replied = msg.reply_to_message;
+  const repliedText = replied ? ((replied as { text?: string; caption?: string }).text ?? (replied as { caption?: string }).caption) : undefined;
+  if (repliedText) {
+    const who = replied?.from?.id === ctx.me?.id ? "Sen (bot) yozgan eding" : `${replied?.from?.first_name ?? "Kimdir"} yozgan`;
+    parts.push("", `--- ${who} ---`, repliedText.slice(0, 1500), "--- tugadi ---");
+  }
+
+  await ctx.api.sendChatAction(ctx.chat!.id, "typing").catch(() => undefined);
+
+  try {
+    const result = await runAgent({
+      api: ctx.api,
+      operator: op,
+      history: [],
+      userText: parts.join("\n"),
+    });
+
+    // Guruhda so'rov tayyorlansa ham tasdiq shaxsiy chatdagidek tugma bilan
+    if (result.pending) {
+      ctx.session.aiPending = result.pending;
+      await ctx.reply(previewText(result.text, result.pending), {
+        parse_mode: "HTML",
+        message_thread_id: msg.message_thread_id,
+        reply_parameters: { message_id: msg.message_id },
+        reply_markup: new InlineKeyboard()
+          .text("✅ Guruhga yuborish", "ai:send")
+          .row()
+          .text("❌ Bekor qilish", "ai:cancel"),
+      });
+      return;
+    }
+
+    await ctx.reply(escapeHtml(result.text), {
+      parse_mode: "HTML",
+      message_thread_id: msg.message_thread_id,
+      reply_parameters: { message_id: msg.message_id },
+    });
+  } catch (err) {
+    console.error("Guruhda assistent javob bera olmadi:", err);
+    await ctx.reply("Hozir javob bera olmadim, biroz keyin urinib ko'ring.", {
+      message_thread_id: msg.message_thread_id,
+      reply_parameters: { message_id: msg.message_id },
+    });
+  }
 }
 
 /** Suhbatni boshidan boshlash */

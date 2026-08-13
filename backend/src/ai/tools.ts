@@ -142,7 +142,11 @@ export const AI_TOOLS = [
   },
   {
     name: "list_tasks",
-    description: "Vazifalar ro'yxati va hisoboti. O'ziniki yoki (ism berilsa) boshqa xodimniki.",
+    description:
+      "SHAXSIY eslatmalar ro'yxati (meeting, qo'ng'iroq — operator o'ziga qo'ygan). " +
+      "Bu dasturchilarga yuborilgan so'rovlar EMAS — ular uchun list_requests ishlatiladi. " +
+      "Operator «vazifa/task» desa ko'pincha bajarilmagan so'rovlarni nazarda tutadi, shuning uchun " +
+      "bu ro'yxat bo'sh chiqsa list_requests ni ham tekshir.",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -491,9 +495,20 @@ async function listTasks(input: any, ctx: ToolContext): Promise<ToolResult> {
   });
 
   const now = new Date();
+  // Bo'sh chiqsa — operator so'rovlarni nazarda tutgan bo'lishi mumkin.
+  // Xulosa chiqarishdan oldin buni tekshirish kerakligini modelga aytamiz.
+  const openRequests = tasks.length === 0 ? await prisma.request.count({ where: { done: false } }) : 0;
+
   return {
     count: tasks.length,
     overdue: tasks.filter((t) => !t.done && t.dueAt < now).length,
+    ...(tasks.length === 0
+      ? {
+          note:
+            `Shaxsiy eslatmalar yo'q. Lekin bazada ${openRequests} ta bajarilmagan SO'ROV bor. ` +
+            "Operator ehtimol o'shalarni so'ragan — list_requests bilan tekshirib, javobda ikkalasini ham ayt.",
+        }
+      : {}),
     tasks: tasks.map((t) => ({
       id: t.id,
       title: t.title,

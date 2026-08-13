@@ -3,7 +3,16 @@ import { config } from "../config";
 import { prisma } from "../db";
 import { SETTING_BACKLOG_CHAT, SETTING_DEV_GROUP, setSetting } from "../settings";
 import { ticketId } from "../util";
-import { aiAvailable, collectForAi, handleAiCancel, handleAiSend, handleAiText, resetAi } from "./handlers/ai";
+import {
+  aiAvailable,
+  collectForAi,
+  handleAiCancel,
+  handleAiSend,
+  handleAiText,
+  handleGroupMention,
+  isGroupMention,
+  resetAi,
+} from "./handlers/ai";
 import { cmdAdmin, cmdReport, handleAdminLogin, handleAdminPassword } from "./handlers/admin";
 import {
   cancelForward,
@@ -96,6 +105,21 @@ import { MyContext, SessionData } from "./types";
 function threadOf(msg?: { is_topic_message?: boolean; message_thread_id?: number }): number | undefined {
   return msg?.is_topic_message ? msg.message_thread_id : undefined;
 }
+
+/**
+ * Sessiya kaliti: shaxsiy chatda chat ID (eski yozuvlar saqlanib qolsin),
+ * guruhda esa chat+foydalanuvchi — bir guruhdagi ikki odam bir-birining
+ * suhbatiga tushib qolmasligi uchun.
+ */
+const sessionMiddleware = session({
+  initial: (): SessionData => ({ step: "idle" }),
+  storage: new PrismaStorage<SessionData>(),
+  getSessionKey: (ctx) => {
+    if (!ctx.chat) return undefined;
+    if (ctx.chat.type === "private") return String(ctx.chat.id);
+    return ctx.from ? `${ctx.chat.id}:${ctx.from.id}` : undefined;
+  },
+});
 
 function createBot(): Bot<MyContext> {
   const bot = new Bot<MyContext>(config.botToken);
@@ -399,18 +423,19 @@ function createBot(): Bot<MyContext> {
     await next();
   });
 
+  // Guruhda "girgitton" deyilsa yoki bot xabariga reply qilinsa — assistent javob beradi.
+  // Sessiya faqat shu holatda yuklanadi, aks holda har bir guruh xabariga yozuv bo'lardi.
+  const groupAi = bot.filter((ctx) => aiAvailable() && isGroupMention(ctx));
+  groupAi.use(sessionMiddleware);
+  groupAi.on("message", handleGroupMention);
+
   // Qolgan hamma narsa faqat shaxsiy chatda
   bot.use(async (ctx, next) => {
     if (ctx.chat && ctx.chat.type !== "private") return;
     await next();
   });
 
-  bot.use(
-    session({
-      initial: (): SessionData => ({ step: "idle" }),
-      storage: new PrismaStorage<SessionData>(),
-    })
-  );
+  bot.use(sessionMiddleware);
 
   // Mijoz xabari forward qilinsa — eng qisqa yo'l: forward → tur → modul → maktab.
   // /new wizardining izoh bosqichida (req_desc) forward eski tartibda biriktirma bo'lib qoladi.

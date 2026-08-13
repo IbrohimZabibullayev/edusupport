@@ -67,6 +67,27 @@ Ketgan vaqt, takroriylik yoki maktab nomi **hech qachon to'qilmaydi**.
 | «qilinmagan vazifalar nechta?» | hisobot beradi |
 | «shu hafta kim nechta so'rov qilgan?» | operatorlar kesimida statistika |
 
+### Guruhda ham javob beradi
+
+Guruh chatida bot faqat chaqirilganda aralashadi — uch yo'l bilan:
+
+- **`girgitton`** deb yozilsa (nomi bilan chaqirish)
+- botning xabariga **reply** qilinsa (suhbat davomi)
+- **@username** bilan tag qilinsa
+
+```
+👤 girgitton nechta bajarilmagan so'rov bor?
+
+🤖 Hozircha 8 ta bajarilmagan so'rov bor:
+   • ES-0834 — Bug, Najot Ta'lim, Moliya
+   • ES-0833 — Bug, Najot Ta'lim, Moliya
+   ...
+```
+
+Boshqa guruh xabarlariga javob bermaydi. Guruhda suhbat tarixi saqlanmaydi — uzluksizlik reply orqali beriladi: javob berilayotgan xabar kontekst sifatida qo'shiladi. Ro'yxatdan o'tmagan odamga bot avval shaxsiy chatda `/start` qilishni aytadi.
+
+> «Vazifa» so'zi ikki xil ma'noda ishlatilgani uchun bot ikkalasini ham tekshiradi: **so'rovlar** (dasturchilarga yuborilgan) va **shaxsiy eslatmalar** (meeting, qo'ng'iroq). Shaxsiy ro'yxat bo'sh bo'lsa «hech narsa yo'q» demaydi — so'rovlarni ham qaraydi.
+
 `/yangi` — suhbatni tozalash. Suhbat 30 daqiqa jimlikdan keyin o'zi tozalanadi.
 
 ### Model va xarajat
