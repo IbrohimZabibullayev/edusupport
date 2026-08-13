@@ -99,8 +99,8 @@ export interface AgentResult {
   history: AiTurn[];
   /** Yaratilgan so'rov raqamlari */
   created: string[];
-  /** Tasdiq kutayotgan amal — bot tugma bilan so'raydi */
-  pending?: Pending;
+  /** Tasdiq kutayotgan amallar — bot tugma bilan so'raydi */
+  pendings: Pending[];
 }
 
 /**
@@ -123,6 +123,7 @@ export async function runAgent(opts: {
     operator: opts.operator,
     attachments: opts.attachments ?? [],
     created: [],
+    pendings: [],
   };
 
   let text = "";
@@ -140,7 +141,12 @@ export async function runAgent(opts: {
     });
 
     if (response.stop_reason === "refusal") {
-      return { text: "Bu so'rovni bajara olmadim. Boshqacha ifodalab ko'ring.", history: opts.history, created: [] };
+      return {
+        text: "Bu so'rovni bajara olmadim. Boshqacha ifodalab ko'ring.",
+        history: opts.history,
+        created: [],
+        pendings: [],
+      };
     }
 
     messages.push({ role: "assistant", content: response.content });
@@ -176,6 +182,6 @@ export async function runAgent(opts: {
     text: text || "Bajarildi.",
     history: messages,
     created: toolCtx.created,
-    pending: toolCtx.pending,
+    pendings: toolCtx.pendings,
   };
 }

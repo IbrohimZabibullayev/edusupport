@@ -190,11 +190,11 @@ async function askAi(
 
     // So'rov tayyorlangan bo'lsa — avval ko'rsatib tasdiq so'raymiz.
     // Guruhga faqat operator tugmani bosgandan keyin ketadi.
-    if (result.pending) {
-      ctx.session.aiPending = result.pending;
-      await ctx.reply(previewText(result.text, result.pending), {
+    if (result.pendings.length > 0) {
+      ctx.session.aiPending = result.pendings;
+      await ctx.reply(previewAll(result.text, result.pendings), {
         parse_mode: "HTML",
-        reply_markup: confirmKeyboard(result.pending),
+        reply_markup: confirmKeyboard(result.pendings),
       });
       return;
     }
@@ -215,11 +215,36 @@ async function askAi(
  * aynan nima yuborilishini ko'rishi kerak.
  */
 /** Tasdiq tugmalari — so'rov guruhga, xabar esa odamlarga ketadi */
-function confirmKeyboard(p: Pending): InlineKeyboard {
-  return new InlineKeyboard()
-    .text(p.kind === "message" ? "✅ Yuborish" : "✅ Guruhga yuborish", "ai:send")
-    .row()
-    .text("❌ Bekor qilish", "ai:cancel");
+function confirmKeyboard(ps: Pending[]): InlineKeyboard {
+  const onlyMessages = ps.every((p) => p.kind === "message");
+  const label = ps.length > 1 ? `✅ Hammasini yuborish (${ps.length})` : onlyMessages ? "✅ Yuborish" : "✅ Guruhga yuborish";
+  return new InlineKeyboard().text(label, "ai:send").row().text("❌ Bekor qilish", "ai:cancel");
+}
+
+/** Bir necha amal tayyorlangan bo'lsa hammasini bitta ko'rinishda beramiz */
+function previewAll(aiText: string, ps: Pending[]): string {
+  if (ps.length === 1) return previewText(aiText, ps[0]);
+
+  const blocks = ps.map((p, i) => {
+    if (p.kind === "message") {
+      const who = p.targets.map((t) => t.label).join(", ");
+      return [`<b>${i + 1}.</b> 📨 ${escapeHtml(who)}`, escapeHtml(p.text)].join("\n");
+    }
+    return [
+      `<b>${i + 1}.</b> ${escapeHtml(p.typeLabel)} — ${escapeHtml(p.schoolName)}, ${escapeHtml(p.moduleName)}`,
+      escapeHtml(p.description.split("\n")[0].slice(0, 160)),
+    ].join("\n");
+  });
+
+  return [
+    aiText ? escapeHtml(aiText) : `${ps.length} ta amal tayyorlandi.`,
+    "",
+    "━━━━━━━━━━━━━━━━",
+    blocks.join("\n\n"),
+    "━━━━━━━━━━━━━━━━",
+    "",
+    "Hammasini yuboraymi?",
+  ].join("\n");
 }
 
 function previewText(aiText: string, p: Pending): string {
@@ -259,8 +284,8 @@ function previewText(aiText: string, p: Pending): string {
 
 /** "✅ Guruhga yuborish" — endi haqiqiy so'rov yaratiladi */
 export async function handleAiSend(ctx: MyContext): Promise<void> {
-  const pending = ctx.session.aiPending as Pending | undefined;
-  if (!pending) {
+  const pendings = (ctx.session.aiPending ?? []) as Pending[];
+  if (pendings.length === 0) {
     await ctx.answerCallbackQuery({ text: "Bu so'rov eskirgan", show_alert: true });
     return;
   }
@@ -271,27 +296,37 @@ export async function handleAiSend(ctx: MyContext): Promise<void> {
   await ctx.answerCallbackQuery({ text: "Yuborilyapti..." });
   await ctx.editMessageReplyMarkup({ reply_markup: undefined }).catch(() => undefined);
 
-  try {
-    if (pending.kind === "message") {
-      const { sent, failed } = await submitPendingMessage(ctx.api, pending);
-      const lines = [`✅ ${sent} ta odamga yuborildi.`];
-      // Botni bloklagan yoki /start qilmaganlarga yetib bormaydi — rostini aytamiz
-      if (failed.length > 0) {
-        lines.push(`⚠️ Yetib bormadi: ${failed.join(", ")}`, "<i>Ular botni bloklagan yoki /start qilmagan.</i>");
-      }
-      await ctx.reply(lines.join("\n"), { parse_mode: "HTML", reply_markup: menu() });
-      return;
-    }
+  // Bittasi yiqilsa qolganlari baribir ketishi kerak — har birini alohida bajaramiz
+  const lines: string[] = [];
+  let people = 0;
+  const undelivered: string[] = [];
 
-    const { ticketNumber, delivery } = await submitPending(ctx.api, op, pending);
-    await ctx.reply(deliveryLine(ticketNumber, delivery), {
-      parse_mode: "HTML",
-      reply_markup: menu(),
-    });
-  } catch (err) {
-    console.error("Tasdiqlangan amal bajarilmadi:", err);
-    await ctx.reply("Yuborishda xato bo'ldi. Qaytadan urinib ko'ring.", { reply_markup: menu() });
+  for (const p of pendings) {
+    try {
+      if (p.kind === "message") {
+        const { sent, failed } = await submitPendingMessage(ctx.api, p);
+        people += sent;
+        undelivered.push(...failed);
+      } else {
+        const { ticketNumber, delivery } = await submitPending(ctx.api, op, p);
+        lines.push(deliveryLine(ticketNumber, delivery));
+      }
+    } catch (err) {
+      console.error("Tasdiqlangan amal bajarilmadi:", err);
+      lines.push("⚠️ Bitta amal bajarilmadi — texnik xato.");
+    }
   }
+
+  if (people > 0) lines.unshift(`✅ ${people} ta manzilga yuborildi.`);
+  // Botni bloklagan yoki /start qilmaganlarga yetib bormaydi — rostini aytamiz
+  if (undelivered.length > 0) {
+    lines.push(
+      `⚠️ Yetib bormadi: ${undelivered.join(", ")}`,
+      "<i>Ular botni bloklagan yoki botga hech qachon /start yozmagan.</i>"
+    );
+  }
+
+  await ctx.reply(lines.join("\n") || "Bajarildi.", { parse_mode: "HTML", reply_markup: menu() });
 }
 
 /** "❌ Bekor qilish" */
@@ -376,13 +411,13 @@ export async function handleGroupMention(ctx: MyContext): Promise<void> {
     });
 
     // Guruhda so'rov tayyorlansa ham tasdiq shaxsiy chatdagidek tugma bilan
-    if (result.pending) {
-      ctx.session.aiPending = result.pending;
-      await ctx.reply(previewText(result.text, result.pending), {
+    if (result.pendings.length > 0) {
+      ctx.session.aiPending = result.pendings;
+      await ctx.reply(previewAll(result.text, result.pendings), {
         parse_mode: "HTML",
         message_thread_id: msg.message_thread_id,
         reply_parameters: { message_id: msg.message_id },
-        reply_markup: confirmKeyboard(result.pending),
+        reply_markup: confirmKeyboard(result.pendings),
       });
       return;
     }

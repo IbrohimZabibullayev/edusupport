@@ -66,8 +66,12 @@ export interface ToolContext {
   attachments: DraftAttachment[];
   /** Assistent yaratgan so'rovlar — javobda ko'rsatish uchun */
   created: string[];
-  /** Tasdiq kutayotgan amal (so'rov yoki xabar) */
-  pending?: Pending;
+  /**
+   * Tasdiq kutayotgan amallar. Bitta navbatda model bir necha marta amal
+   * chaqirishi mumkin (masalan uch xodimga uchta xabar) — shuning uchun ro'yxat.
+   * Ilgari bitta maydon edi va har yangisi eskisini o'chirib yuborardi.
+   */
+  pendings: Pending[];
 }
 
 type ToolResult = Record<string, unknown>;
@@ -355,10 +359,11 @@ async function createRequest(input: any, ctx: ToolContext): Promise<ToolResult> 
   const original = String(input.client_message ?? "").trim();
   const description = original && original !== summary ? `${summary}\n\n— Mijoz xabari —\n${original}` : summary;
 
-  ctx.pending = {
+  const schoolName = (await prisma.school.findUnique({ where: { id: school.id } }))!.name;
+  ctx.pendings.push({
     kind: "request",
     schoolId: school.id,
-    schoolName: (await prisma.school.findUnique({ where: { id: school.id } }))!.name,
+    schoolName,
     moduleId: mod.id,
     moduleName: mod.name,
     systemId: sys?.id,
@@ -367,11 +372,11 @@ async function createRequest(input: any, ctx: ToolContext): Promise<ToolResult> 
     typeLabel: `${type.emoji} ${type.name}`.trim(),
     description,
     attachments: ctx.attachments,
-  };
+  });
 
   return {
     prepared: true,
-    school: ctx.pending.schoolName,
+    school: schoolName,
     module: mod.name,
     system: sys?.name ?? null,
     type: type.key,
@@ -380,6 +385,43 @@ async function createRequest(input: any, ctx: ToolContext): Promise<ToolResult> 
       "Javobingda bir qatorda nima tayyorlaganingni ayt (maktab, modul, tur) va tasdiqlashini so'ra. " +
       "'Yubordim' yoki 'guruhga tushdi' deb YOZMA.",
   };
+}
+
+/**
+ * Guruh chatini topadi.
+ *
+ * Guruh ikki joyda sozlangan bo'lishi mumkin: umumiy (Setting.devGroupId) yoki
+ * tizimga biriktirilgan (System.groupChatId) — /setgroup da qaysi variant
+ * tanlanganiga qarab. Faqat bittasini qarash "guruh sozlanmagan" degan noto'g'ri
+ * xulosaga olib kelardi.
+ */
+async function resolveGroupChat(
+  systemName?: string
+): Promise<{ chatId: string; label: string } | { needs_clarification: string; message: string; options?: unknown }> {
+  const systems = await getActiveSystems();
+
+  if (systemName) {
+    const sys = pickByName(systems, systemName);
+    if (sys?.groupChatId) return { chatId: sys.groupChatId, label: `${sys.name} guruhi` };
+  }
+
+  const dev = await getDevGroupId();
+  if (dev) return { chatId: dev, label: "Dasturchilar guruhi" };
+
+  // Umumiy guruh yo'q — tizimlarga biriktirilganlarini qaraymiz
+  const withGroup = systems.filter((s) => s.groupChatId);
+  if (withGroup.length === 1) {
+    return { chatId: withGroup[0].groupChatId!, label: `${withGroup[0].name} guruhi` };
+  }
+  if (withGroup.length > 1) {
+    return {
+      needs_clarification: "group",
+      message: "Bir nechta guruh bor — foydalanuvchidan qaysi tizim guruhiga yuborishni so'ra.",
+      options: withGroup.map((s) => s.name),
+    };
+  }
+
+  return { needs_clarification: "group", message: "Guruh sozlanmagan — guruh ichida /setgroup yozish kerak." };
 }
 
 /**
@@ -424,27 +466,16 @@ async function prepareMessage(input: any, ctx: ToolContext): Promise<ToolResult>
   }
 
   if (input.to_group) {
-    let chatId: string | null = null;
-    let label = "Dasturchilar guruhi";
-    if (input.system) {
-      const sys = pickByName(await getActiveSystems(), String(input.system));
-      if (sys?.groupChatId) {
-        chatId = sys.groupChatId;
-        label = `${sys.name} guruhi`;
-      }
-    }
-    if (!chatId) chatId = (await getDevGroupId()) || null;
-    if (!chatId) {
-      return { error: "Guruh sozlanmagan — guruh ichida /setgroup yozish kerak." };
-    }
-    targets.push({ chatId, label });
+    const group = await resolveGroupChat(input.system ? String(input.system) : undefined);
+    if ("needs_clarification" in group) return group;
+    targets.push(group);
   }
 
   if (targets.length === 0) {
     return { needs_clarification: "targets", message: "Kimga yuborilishi aniq emas — foydalanuvchidan so'ra." };
   }
 
-  ctx.pending = { kind: "message", targets, text };
+  ctx.pendings.push({ kind: "message", targets, text });
   return {
     prepared: true,
     to: targets.map((t) => t.label),
