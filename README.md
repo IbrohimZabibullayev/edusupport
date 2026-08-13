@@ -66,6 +66,25 @@ Ketgan vaqt, takroriylik yoki maktab nomi **hech qachon to'qilmaydi**.
 | «Feruzaga ertaga 10:00 ga hisobotni topshir» | topshiriq beradi va unga xabar yuboradi |
 | «qilinmagan vazifalar nechta?» | hisobot beradi |
 | «shu hafta kim nechta so'rov qilgan?» | operatorlar kesimida statistika |
+| «Muhammadjonga yoz: ochiq so'rovlaringizni yoping» | o'sha odamga shaxsiy xabar yuboradi |
+| «guruhga yoz: ertaga 10 da yig'ilish» | dasturchilar guruhiga xabar yozadi |
+
+### Xabar tarqatish
+
+Bot guruhlarda a'zo va operatorlarning chat ID'lari bazada — shuning uchun u odamlarga ham, guruhga ham yoza oladi:
+
+```
+👤 Muhammadjon bilan Husniddinga eslatma yubor:
+   bugungi ochiq ticketlarni yoping
+
+🤖 Tayyorladim. Kimga: Muhammadjon Tursunov, Husniddin Hamidov
+   «Assalomu alaykum. Bugungi ochiq ticketlaringizni yoping.»
+   [ ✅ Yuborish ]  [ ❌ Bekor qilish ]
+```
+
+Bu ham tasdiqsiz ketmaydi — kimga va nima yuborilishini ko'rasiz. Yuborilgach bot nechta odamga yetganini aytadi; kimdir botni bloklagan bo'lsa buni ham yashirmaydi.
+
+**Hamma operatorlarga tarqatishni faqat admin qila oladi.** Oddiy operator kerakli odamlarni nomma-nom aytishi kerak.
 
 ### Guruhda ham javob beradi
 

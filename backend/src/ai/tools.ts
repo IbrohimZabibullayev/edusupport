@@ -16,6 +16,7 @@ import { getActiveModules } from "../bot/services/modules";
 import { getActiveRequestTypes } from "../bot/services/requestTypes";
 import { createSchool, schoolCandidates } from "../bot/services/schools";
 import { getActiveSystems } from "../bot/services/systems";
+import { getDevGroupId } from "../settings";
 import { DraftAttachment } from "../bot/types";
 
 /**
@@ -33,6 +34,7 @@ import { DraftAttachment } from "../bot/types";
  * haqiqiy so'rov yaratiladi va guruhga ketadi.
  */
 export interface PendingRequest {
+  kind: "request";
   schoolId: number;
   schoolName: string;
   moduleId: number;
@@ -45,6 +47,18 @@ export interface PendingRequest {
   attachments: DraftAttachment[];
 }
 
+/**
+ * Tasdiq kutayotgan xabar. Odamlarga va guruhga yozish — orqaga qaytmaydigan
+ * amal, shuning uchun so'rov kabi avval ko'rsatiladi va tugma bilan yuboriladi.
+ */
+export interface PendingMessage {
+  kind: "message";
+  targets: { chatId: string; label: string }[];
+  text: string;
+}
+
+export type Pending = PendingRequest | PendingMessage;
+
 export interface ToolContext {
   api: Api;
   operator: Operator;
@@ -52,8 +66,8 @@ export interface ToolContext {
   attachments: DraftAttachment[];
   /** Assistent yaratgan so'rovlar — javobda ko'rsatish uchun */
   created: string[];
-  /** Tasdiq kutayotgan so'rov qoralamasi */
-  pending?: PendingRequest;
+  /** Tasdiq kutayotgan amal (so'rov yoki xabar) */
+  pending?: Pending;
 }
 
 type ToolResult = Record<string, unknown>;
@@ -180,6 +194,30 @@ export const AI_TOOLS = [
     },
   },
   {
+    name: "send_message",
+    description:
+      "Operatorlarga shaxsiy xabar va/yoki dasturchilar guruhiga xabar TAYYORLAYDI (hali yubormaydi). " +
+      "Eslatma tarqatish uchun ishlatiladi: «falon tasklaringiz qolib ketti» kabi. " +
+      "Bot operatorga ko'rsatib tasdiq so'raydi, faqat o'shandan keyin yuboriladi — «yubordim» dema. " +
+      "Har kimga o'ziga tegishli ma'lumot kerak bo'lsa (masalan har birining o'z ticketlari), " +
+      "har bir odam uchun alohida chaqir.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        text: { type: "string", description: "Yuboriladigan xabar matni — tayyor ko'rinishda" },
+        to_operators: {
+          type: "array",
+          items: { type: "string" },
+          description: "Kimga: operator ismlari. Bitta odamga bo'lsa bitta ism.",
+        },
+        to_all_operators: { type: "boolean", description: "Hamma operatorlarga (faqat admin qila oladi)" },
+        to_group: { type: "boolean", description: "Dasturchilar guruhiga yozilsinmi" },
+        system: { type: "string", description: "to_group bilan: qaysi tizim guruhi. Bo'sh bo'lsa umumiy guruh." },
+      },
+      required: ["text"],
+    },
+  },
+  {
     name: "stats",
     description: "Raqamli hisobot: davr bo'yicha nechta so'rov, nechta support log, qancha vaqt ketgani.",
     input_schema: {
@@ -274,6 +312,8 @@ export async function runTool(name: string, input: any, ctx: ToolContext): Promi
       return finishTask(input, ctx);
     case "list_requests":
       return listRequests(input);
+    case "send_message":
+      return prepareMessage(input, ctx);
     case "stats":
       return stats(input);
     default:
@@ -316,6 +356,7 @@ async function createRequest(input: any, ctx: ToolContext): Promise<ToolResult> 
   const description = original && original !== summary ? `${summary}\n\n— Mijoz xabari —\n${original}` : summary;
 
   ctx.pending = {
+    kind: "request",
     schoolId: school.id,
     schoolName: (await prisma.school.findUnique({ where: { id: school.id } }))!.name,
     moduleId: mod.id,
@@ -339,6 +380,95 @@ async function createRequest(input: any, ctx: ToolContext): Promise<ToolResult> 
       "Javobingda bir qatorda nima tayyorlaganingni ayt (maktab, modul, tur) va tasdiqlashini so'ra. " +
       "'Yubordim' yoki 'guruhga tushdi' deb YOZMA.",
   };
+}
+
+/**
+ * Xabarni tayyorlaydi, lekin YUBORMAYDI. Odamlarga yozish orqaga qaytmaydi,
+ * shuning uchun operator ko'rib tugmani bosgandan keyin ketadi.
+ */
+async function prepareMessage(input: any, ctx: ToolContext): Promise<ToolResult> {
+  const text = String(input.text ?? "").trim();
+  if (text.length < 3) {
+    return { needs_clarification: "text", message: "Xabar matni bo'sh — nima yozilishini so'ra." };
+  }
+
+  const targets: { chatId: string; label: string }[] = [];
+  const notFound: string[] = [];
+
+  if (input.to_all_operators) {
+    if (!ctx.operator.isAdmin) {
+      return { error: "Hammaga tarqatishni faqat admin qila oladi. Kerakli odamlarni nomma-nom ayting." };
+    }
+    const all = await prisma.operator.findMany({ where: { status: "APPROVED" } });
+    for (const o of all) targets.push({ chatId: o.telegramId, label: o.fullName });
+  }
+
+  for (const name of (input.to_operators ?? []) as string[]) {
+    const target = await findOperator(String(name));
+    if (!target) {
+      notFound.push(String(name));
+      continue;
+    }
+    if (!targets.some((t) => t.chatId === target.telegramId)) {
+      targets.push({ chatId: target.telegramId, label: target.fullName });
+    }
+  }
+
+  if (notFound.length > 0) {
+    const all = await prisma.operator.findMany({ where: { status: "APPROVED" }, select: { fullName: true } });
+    return {
+      needs_clarification: "person",
+      message: `Bu xodim(lar) topilmadi: ${notFound.join(", ")}. Foydalanuvchidan aniqlashtir.`,
+      options: all.map((o) => o.fullName),
+    };
+  }
+
+  if (input.to_group) {
+    let chatId: string | null = null;
+    let label = "Dasturchilar guruhi";
+    if (input.system) {
+      const sys = pickByName(await getActiveSystems(), String(input.system));
+      if (sys?.groupChatId) {
+        chatId = sys.groupChatId;
+        label = `${sys.name} guruhi`;
+      }
+    }
+    if (!chatId) chatId = (await getDevGroupId()) || null;
+    if (!chatId) {
+      return { error: "Guruh sozlanmagan — guruh ichida /setgroup yozish kerak." };
+    }
+    targets.push({ chatId, label });
+  }
+
+  if (targets.length === 0) {
+    return { needs_clarification: "targets", message: "Kimga yuborilishi aniq emas — foydalanuvchidan so'ra." };
+  }
+
+  ctx.pending = { kind: "message", targets, text };
+  return {
+    prepared: true,
+    to: targets.map((t) => t.label),
+    note:
+      "Xabar tayyorlandi, HALI YUBORILMADI. Bot operatorga ko'rsatib tasdiq so'raydi. " +
+      "Javobingda kimga yuborilishini ayt va tasdiqlashini so'ra. 'Yubordim' deb YOZMA.",
+  };
+}
+
+/** Tasdiqdan keyin xabarni haqiqatan yuboradi */
+export async function submitPendingMessage(api: Api, pending: PendingMessage) {
+  let sent = 0;
+  const failed: string[] = [];
+  for (const t of pending.targets) {
+    try {
+      await api.sendMessage(t.chatId, pending.text);
+      sent++;
+    } catch (err) {
+      // Odam botni bloklagan yoki hech qachon /start qilmagan bo'lishi mumkin
+      console.error(`Xabar ${t.label} ga yuborilmadi:`, err);
+      failed.push(t.label);
+    }
+  }
+  return { sent, failed };
 }
 
 /** Tasdiqdan keyin haqiqiy so'rovni yaratadi va guruhga yo'naltiradi */

@@ -2,7 +2,7 @@ import { InlineKeyboard } from "grammy";
 import { Message } from "grammy/types";
 import { AiTurn, runAgent } from "../../ai/agent";
 import { aiEnabled } from "../../ai/client";
-import { PendingRequest, submitPending } from "../../ai/tools";
+import { Pending, submitPending, submitPendingMessage } from "../../ai/tools";
 import { prisma } from "../../db";
 import { escapeHtml } from "../../util";
 import { menu } from "../keyboards";
@@ -175,10 +175,7 @@ async function askAi(
       ctx.session.aiPending = result.pending;
       await ctx.reply(previewText(result.text, result.pending), {
         parse_mode: "HTML",
-        reply_markup: new InlineKeyboard()
-          .text("✅ Guruhga yuborish", "ai:send")
-          .row()
-          .text("❌ Bekor qilish", "ai:cancel"),
+        reply_markup: confirmKeyboard(result.pending),
       });
       return;
     }
@@ -198,7 +195,33 @@ async function askAi(
  * Guruhga ketadigan so'rovning ko'rinishi — operator tasdiqlashdan oldin
  * aynan nima yuborilishini ko'rishi kerak.
  */
-function previewText(aiText: string, p: PendingRequest): string {
+/** Tasdiq tugmalari — so'rov guruhga, xabar esa odamlarga ketadi */
+function confirmKeyboard(p: Pending): InlineKeyboard {
+  return new InlineKeyboard()
+    .text(p.kind === "message" ? "✅ Yuborish" : "✅ Guruhga yuborish", "ai:send")
+    .row()
+    .text("❌ Bekor qilish", "ai:cancel");
+}
+
+function previewText(aiText: string, p: Pending): string {
+  if (p.kind === "message") {
+    const many = p.targets.length > 3;
+    const who = many
+      ? `${p.targets.slice(0, 3).map((t) => t.label).join(", ")} va yana ${p.targets.length - 3} ta`
+      : p.targets.map((t) => t.label).join(", ");
+    return [
+      aiText ? escapeHtml(aiText) : "Xabar tayyorlandi.",
+      "",
+      "━━━━━━━━━━━━━━━━",
+      `📨 <b>Kimga:</b> ${escapeHtml(who)}`,
+      "",
+      escapeHtml(p.text),
+      "━━━━━━━━━━━━━━━━",
+      "",
+      "Yuboraymi?",
+    ].join("\n");
+  }
+
   const lines = [
     aiText ? escapeHtml(aiText) : "So'rov tayyorlandi.",
     "",
@@ -217,7 +240,7 @@ function previewText(aiText: string, p: PendingRequest): string {
 
 /** "✅ Guruhga yuborish" — endi haqiqiy so'rov yaratiladi */
 export async function handleAiSend(ctx: MyContext): Promise<void> {
-  const pending = ctx.session.aiPending as PendingRequest | undefined;
+  const pending = ctx.session.aiPending as Pending | undefined;
   if (!pending) {
     await ctx.answerCallbackQuery({ text: "Bu so'rov eskirgan", show_alert: true });
     return;
@@ -230,14 +253,25 @@ export async function handleAiSend(ctx: MyContext): Promise<void> {
   await ctx.editMessageReplyMarkup({ reply_markup: undefined }).catch(() => undefined);
 
   try {
+    if (pending.kind === "message") {
+      const { sent, failed } = await submitPendingMessage(ctx.api, pending);
+      const lines = [`✅ ${sent} ta odamga yuborildi.`];
+      // Botni bloklagan yoki /start qilmaganlarga yetib bormaydi — rostini aytamiz
+      if (failed.length > 0) {
+        lines.push(`⚠️ Yetib bormadi: ${failed.join(", ")}`, "<i>Ular botni bloklagan yoki /start qilmagan.</i>");
+      }
+      await ctx.reply(lines.join("\n"), { parse_mode: "HTML", reply_markup: menu() });
+      return;
+    }
+
     const { ticketNumber, delivery } = await submitPending(ctx.api, op, pending);
     await ctx.reply(deliveryLine(ticketNumber, delivery), {
       parse_mode: "HTML",
       reply_markup: menu(),
     });
   } catch (err) {
-    console.error("Tasdiqlangan so'rov yuborilmadi:", err);
-    await ctx.reply("So'rovni yuborishda xato bo'ldi. Qaytadan urinib ko'ring.", { reply_markup: menu() });
+    console.error("Tasdiqlangan amal bajarilmadi:", err);
+    await ctx.reply("Yuborishda xato bo'ldi. Qaytadan urinib ko'ring.", { reply_markup: menu() });
   }
 }
 
@@ -329,10 +363,7 @@ export async function handleGroupMention(ctx: MyContext): Promise<void> {
         parse_mode: "HTML",
         message_thread_id: msg.message_thread_id,
         reply_parameters: { message_id: msg.message_id },
-        reply_markup: new InlineKeyboard()
-          .text("✅ Guruhga yuborish", "ai:send")
-          .row()
-          .text("❌ Bekor qilish", "ai:cancel"),
+        reply_markup: confirmKeyboard(result.pending),
       });
       return;
     }

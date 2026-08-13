@@ -8,7 +8,7 @@ import { getActiveRequestTypes } from "../bot/services/requestTypes";
 import { getActiveSystems } from "../bot/services/systems";
 import { DraftAttachment } from "../bot/types";
 import { AI_EFFORT, AI_MAX_TOKENS, AI_MODEL, aiClient } from "./client";
-import { AI_TOOLS, PendingRequest, ToolContext, runTool } from "./tools";
+import { AI_TOOLS, Pending, ToolContext, runTool } from "./tools";
 
 /** Suhbat tarixi sessiyada shu ko'rinishda saqlanadi */
 export type AiTurn = Anthropic.MessageParam;
@@ -99,8 +99,8 @@ export interface AgentResult {
   history: AiTurn[];
   /** Yaratilgan so'rov raqamlari */
   created: string[];
-  /** Tasdiq kutayotgan so'rov — bot tugma bilan so'raydi */
-  pending?: PendingRequest;
+  /** Tasdiq kutayotgan amal — bot tugma bilan so'raydi */
+  pending?: Pending;
 }
 
 /**
