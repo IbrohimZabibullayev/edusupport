@@ -170,6 +170,8 @@ Maktab, modul yoki tur bo'yicha toraytirsa ham bo'ladi («Moliya bo'yicha ochiq 
 👀 Guruh xabarlarini ko'ryapman (xotirada 34 ta).
 ```
 
+So'rov kartasi ham aynan shu manzilga tushadi. Tartib: takliflar uchun alohida chat (agar belgilangan bo'lsa) → so'rovning o'z tizimi guruhi → umumiy guruh → yagona sozlangan tizim guruhi. Hech biri topilmasa so'rov yo'qolmasligi uchun adminlarga yuboriladi.
+
 Sozlangani yetarli emas — bot guruhda turgani ham tekshiriladi. Bot chiqarilgan yoki guruh superguruhga aylanib ID o'zgargan bo'lsa shu yerda ko'rinadi. Oxirgi qator bot guruh xabarlarini ko'ra olayotganini aytadi; admin bo'lmasa «yuqoridagi xabarlarni so'rov qil» ishlamaydi va shu yerda ogohlantiriladi.
 
 ### Model va xarajat

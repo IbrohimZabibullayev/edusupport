@@ -60,8 +60,47 @@ export function deliveryLine(ticketNumber: number, delivery: RouteResult): strin
   const id = `<b>${ticketId(ticketNumber)}</b>`;
   if (delivery === "group") return `✅ ${id} guruhga yuborildi`;
   if (delivery === "admins")
-    return `⚠️ ${id} saqlandi, lekin guruhga tushmadi — adminlarga yuborildi.\n<i>Guruh sozlanmagan yoki bot unda yo'q.</i>`;
+    return `⚠️ ${id} saqlandi, lekin guruhga tushmadi — adminlarga yuborildi.\n<i>Sababini bilish uchun botga /guruh yozing.</i>`;
   return `⚠️ ${id} saqlandi, lekin hech qayerga yuborilmadi.\n<i>Admin bilan bog'laning.</i>`;
+}
+
+/**
+ * So'rov qaysi guruhga tushishini aniqlaydi.
+ *
+ * `/setgroup` guruhni ikki xil bog'lay oladi: umumiy (Setting.devGroupId) yoki
+ * bitta tizimga (System.groupChatId). Ilgari bu yerda faqat so'rovning O'Z
+ * tizimi va umumiy guruh qaralardi. Assistent yaratgan so'rovlarda esa tizim
+ * ko'pincha bo'sh bo'ladi — operator uni aytmaydi va taxmin qilib bo'lmaydi.
+ * Natijada guruh tizimga bog'langan bo'lsa, so'rov "guruh sozlanmagan" deb
+ * adminlarga ketib qolardi. Shuning uchun oxirgi zaxira sifatida yagona
+ * sozlangan tizim guruhi ham qaraladi.
+ */
+async function resolveTarget(type: string, systemGroupId: string | null): Promise<string | null> {
+  // Takliflar uchun alohida chat belgilangan bo'lsa — o'sha ustun
+  const backlogChatId = await getBacklogChatId();
+  if (type === "SUGGESTION" && backlogChatId) return backlogChatId;
+
+  if (systemGroupId) return systemGroupId;
+
+  const dev = await getDevGroupId();
+  if (dev) return dev;
+
+  // Umumiy guruh yo'q: guruh tizimga bog'langan bo'lishi mumkin
+  const withGroup = await prisma.system.findMany({
+    where: { groupChatId: { not: null } },
+    orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+    select: { name: true, groupChatId: true },
+  });
+  if (withGroup.length === 1) return withGroup[0].groupChatId;
+  if (withGroup.length > 1) {
+    // Bir nechta tizim guruhi bor, so'rovda tizim ko'rsatilmagan — qaysi biriga
+    // tushishi noaniq. Noto'g'ri jamoaga yuborgandan ko'ra adminlarga beramiz.
+    console.warn(
+      `So'rovda tizim ko'rsatilmagan, lekin ${withGroup.length} ta tizim guruhi bor ` +
+        `(${withGroup.map((s) => s.name).join(", ")}) — qaysi biriga yuborishni aniqlab bo'lmadi.`
+    );
+  }
+  return null;
 }
 
 export async function routeRequest(api: Api, requestId: number): Promise<RouteResult> {
@@ -77,18 +116,9 @@ export async function routeRequest(api: Api, requestId: number): Promise<RouteRe
   const text = await renderCardText(request);
   const keyboard = cardKeyboard(request);
 
-  // Avval tizimning o'z guruhi; taklif uchun backlog chat belgilangan bo'lsa — o'sha yerga;
-  // tizim guruhi bo'lmasa umumiy guruh; u ham bo'lmasa adminlarga
   let target: string | null = null;
   try {
-    const backlogChatId = await getBacklogChatId();
-    if (request.type === "SUGGESTION" && backlogChatId) {
-      target = backlogChatId;
-    } else if (request.system?.groupChatId) {
-      target = request.system.groupChatId;
-    } else {
-      target = (await getDevGroupId()) || null;
-    }
+    target = await resolveTarget(request.type, request.system?.groupChatId ?? null);
 
     if (target) {
       const threadId = await getTopicThreadId(target, request.type);

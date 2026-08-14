@@ -1,7 +1,7 @@
 import { Bot, InlineKeyboard } from "grammy";
 import { config } from "../config";
 import { prisma } from "../db";
-import { SETTING_BACKLOG_CHAT, SETTING_DEV_GROUP, getDevGroupId, setSetting } from "../settings";
+import { SETTING_BACKLOG_CHAT, SETTING_DEV_GROUP, getBacklogChatId, getDevGroupId, setSetting } from "../settings";
 import { ticketId } from "../util";
 import {
   aiAvailable,
@@ -482,6 +482,8 @@ function createBot(): Bot<MyContext> {
     for (const s of systems) {
       lines.push(s.groupChatId ? `🖥 ${s.name}: <code>${s.groupChatId}</code>` : `🖥 ${s.name}: yo'q`);
     }
+    const backlog = await getBacklogChatId();
+    if (backlog) lines.push(`💡 Takliflar (SUGGESTION): <code>${backlog}</code>`);
 
     const target = await resolveGroupChat();
     lines.push("");
