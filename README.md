@@ -109,6 +109,21 @@ Boshqa guruh xabarlariga javob bermaydi. Guruhda suhbat tarixi saqlanmaydi — u
 
 `/yangi` — suhbatni tozalash. Suhbat 30 daqiqa jimlikdan keyin o'zi tozalanadi.
 
+`/guruh` — bot qaysi guruhni ko'rayotganini ko'rsatadi va unga yoza olishini tekshiradi:
+
+```
+🔍 Guruh sozlamasi
+
+📥 Umumiy guruh: -1001234567890
+🖥 Edu Tizim: yo'q
+🖥 EduSchool: yo'q
+
+➡️ Xabarlar shu yerga ketadi: Dasturchilar guruhi
+✅ Bog'lanish bor: Devs
+```
+
+Sozlangani yetarli emas — bot guruhda turgani ham tekshiriladi. Bot chiqarilgan yoki guruh superguruhga aylanib ID o'zgargan bo'lsa shu yerda ko'rinadi.
+
 ### Model va xarajat
 
 **Claude Sonnet 5**, `effort: low`. Uchta variant bir xil 10 ta qiyin holatda o'lchandi:

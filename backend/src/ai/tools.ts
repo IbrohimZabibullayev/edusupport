@@ -395,10 +395,10 @@ async function createRequest(input: any, ctx: ToolContext): Promise<ToolResult> 
  * tanlanganiga qarab. Faqat bittasini qarash "guruh sozlanmagan" degan noto'g'ri
  * xulosaga olib kelardi.
  */
-async function resolveGroupChat(
+export async function resolveGroupChat(
   systemName?: string
 ): Promise<{ chatId: string; label: string } | { needs_clarification: string; message: string; options?: unknown }> {
-  const systems = await getActiveSystems();
+  const systems = await prisma.system.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] });
 
   if (systemName) {
     const sys = pickByName(systems, systemName);

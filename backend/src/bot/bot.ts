@@ -1,7 +1,7 @@
 import { Bot, InlineKeyboard } from "grammy";
 import { config } from "../config";
 import { prisma } from "../db";
-import { SETTING_BACKLOG_CHAT, SETTING_DEV_GROUP, setSetting } from "../settings";
+import { SETTING_BACKLOG_CHAT, SETTING_DEV_GROUP, getDevGroupId, setSetting } from "../settings";
 import { ticketId } from "../util";
 import {
   aiAvailable,
@@ -98,6 +98,7 @@ import {
 } from "./handlers/tasks";
 import { getActiveRequestTypes, requestTypeLabel } from "./services/requestTypes";
 import { learnTopic } from "./services/topics";
+import { resolveGroupChat } from "../ai/tools";
 import { sessionMiddleware } from "./session";
 import { BTN_NEW_REQUEST, BTN_SUPPORT_LOG, BTN_TASKS } from "./texts";
 import { MyContext, SessionData } from "./types";
@@ -446,6 +447,40 @@ function createBot(): Bot<MyContext> {
   bot.command("admin", cmdAdmin);
   bot.command("report", cmdReport);
   bot.command("tasks", showTasks);
+
+  // /guruh — bot qaysi guruhni ko'rayotganini va unga yoza olishini tekshiradi.
+  // "Guruh bor-ku, nega so'rayapti?" degan savolni bir marta yopish uchun.
+  bot.command("guruh", async (ctx) => {
+    if (ctx.chat.type !== "private") return;
+    const lines: string[] = ["🔍 <b>Guruh sozlamasi</b>", ""];
+
+    const dev = await getDevGroupId();
+    const systems = await prisma.system.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] });
+    lines.push(dev ? `📥 Umumiy guruh: <code>${dev}</code>` : "📥 Umumiy guruh: yo'q");
+    for (const s of systems) {
+      lines.push(s.groupChatId ? `🖥 ${s.name}: <code>${s.groupChatId}</code>` : `🖥 ${s.name}: yo'q`);
+    }
+
+    const target = await resolveGroupChat();
+    lines.push("");
+    if ("needs_clarification" in target) {
+      lines.push(`⚠️ ${target.message}`);
+    } else {
+      lines.push(`➡️ Xabarlar shu yerga ketadi: <b>${target.label}</b>`);
+      // Sozlangani yetarli emas — bot guruhda turgani ham tekshiriladi
+      try {
+        const chat = await ctx.api.getChat(target.chatId);
+        lines.push(`✅ Bog'lanish bor: ${"title" in chat ? chat.title : target.chatId}`);
+      } catch (err) {
+        lines.push(
+          "❌ Bog'lana olmadim — bot guruhdan chiqarilgan yoki ID eskirgan.",
+          "<i>Guruh ichida /setgroup ni qayta yozing.</i>"
+        );
+        console.error("Guruhga bog'lanib bo'lmadi:", err);
+      }
+    }
+    await ctx.reply(lines.join("\n"), { parse_mode: "HTML" });
+  });
   // Assistent suhbatini tozalash
   bot.command("yangi", resetAi);
   bot.command("reset", resetAi);
