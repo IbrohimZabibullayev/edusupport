@@ -58,6 +58,16 @@ export interface RequestDraft {
   similarSchoolIds?: number[];
   /** Maktab operator tomonidan tasdiqlanganmi — xotiradan kelgani ham so'raladi */
   schoolConfirmed?: boolean;
+  /**
+   * Mas'ul va muddat — guruhda so'rov yaratilayotganda darrov ma'lum bo'lishi
+   * mumkin (tag qilingan odam, «ertagagacha»). Karta shu ma'lumot bilan
+   * chiziladi, keyin qayta tahrirlanmaydi.
+   */
+  assigneeName?: string;
+  assigneeUsername?: string;
+  /** Qo'shimcha mas'ullar, vergul bilan */
+  assigneeExtra?: string;
+  deadline?: Date;
 }
 
 export interface TaskDraft {

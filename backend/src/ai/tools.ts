@@ -5,12 +5,14 @@ import {
   formatMinutes,
   formatTashkentDate,
   formatTashkentTime,
+  parseDeadlineTashkent,
   parseWhenTashkent,
   tashkentDayStart,
   tashkentMonthStart,
   tashkentWeekStart,
   ticketId,
 } from "../util";
+import { refreshCard } from "../bot/services/card";
 import { createRequestFromDraft } from "../bot/services/createRequest";
 import { getActiveModules } from "../bot/services/modules";
 import { getActiveRequestTypes } from "../bot/services/requestTypes";
@@ -45,6 +47,13 @@ export interface PendingRequest {
   typeLabel: string;
   description: string;
   attachments: DraftAttachment[];
+  /** Guruhda tag qilingan mas'ul(lar) — kartada ko'rsatiladi va eslatma o'shanga boradi */
+  assigneeName?: string;
+  assigneeUsername?: string;
+  /** Qo'shimcha mas'ullar — kartada bitta asosiy mas'ul bo'lgani uchun matnga yoziladi */
+  otherAssignees?: string[];
+  /** Muddat (ISO). Qo'yilsa har kuni eslatib turiladi, bajarilgunicha */
+  deadline?: string;
 }
 
 /**
@@ -57,13 +66,31 @@ export interface PendingMessage {
   text: string;
 }
 
-export type Pending = PendingRequest | PendingMessage;
+/**
+ * Tasdiq kutayotgan ommaviy o'zgartirish: mavjud so'rovlarga muddat va/yoki
+ * mas'ul qo'yish. O'nlab kartani birdaniga o'zgartiradi, shuning uchun
+ * ko'rsatilib, tugma bosilgandan keyin qo'llanadi.
+ */
+export interface PendingUpdate {
+  kind: "update";
+  requestIds: number[];
+  tickets: number[];
+  deadline?: string;
+  assigneeName?: string;
+  assigneeUsername?: string;
+  otherAssignees?: string[];
+}
+
+export type Pending = PendingRequest | PendingMessage | PendingUpdate;
 
 export interface ToolContext {
   api: Api;
   operator: Operator;
   /** Forward qilingan/yuborilgan fayllar — so'rovga biriktiriladi */
   attachments: DraftAttachment[];
+  /** Guruhda chaqirilgan bo'lsa — qaysi guruh/bo'limda. `from_message_ids` shu yerdan qidiriladi */
+  groupChatId?: string;
+  groupThreadId?: number;
   /** Assistent yaratgan so'rovlar — javobda ko'rsatish uchun */
   created: string[];
   /**
@@ -110,8 +137,66 @@ export const AI_TOOLS = [
           description: "Faqat foydalanuvchi yangi maktab ochishga rozi bo'lgandan keyin true qil.",
         },
         school_id: { type: "number", description: "Aniqlashtirishdan keyin tanlangan maktab ID si." },
+        from_message_ids: {
+          type: "array",
+          items: { type: "number" },
+          description:
+            "Guruhdagi xabar raqamlari (kontekstda [#123] ko'rinishida beriladi). Foydalanuvchi " +
+            "«yuqoridagi xabarlarni so'rov qil» desa — kerakli xabarlarning raqamlarini shu yerga yoz. " +
+            "O'sha xabarlardagi rasm/video/fayllar so'rovga o'zi biriktiriladi, sen ularni tasvirlab o'tirma.",
+        },
+        assignees: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Mas'ul xodimlar — guruhda tag qilingan @username lar. Xabarda kimdir tag qilingan bo'lsa " +
+            "shu yerga aynan o'sha ko'rinishda yoz. Hech kim tag qilinmagan bo'lsa tashlab ket.",
+        },
+        deadline: {
+          type: "string",
+          description:
+            "Muddat: «ertaga», «3 kun», «juma», «20.08» kabi. Muddat qo'yilsa bot bajarilgunicha " +
+            "har kuni eslatib turadi. Foydalanuvchi «eslatib tur» desa muddat qo'yish SHART; " +
+            "aniq vaqt aytilmagan bo'lsa «ertaga» deb yoz.",
+        },
       },
       required: ["school", "description"],
+    },
+  },
+  {
+    name: "update_requests",
+    description:
+      "Mavjud so'rovlarga muddat va/yoki mas'ul BELGILAYDI — bittasiga ham, hammasiga ham. " +
+      "«Bajarilmagan tasklarga ertagagacha muddat qo'y», «ES-0834 ni Dostonbekka ber», " +
+      "«Moliya bo'yicha ochiq so'rovlarni falonchiga biriktir» kabi so'rovlarda ishlatiladi. " +
+      "TAYYORLAYDI — operator tugmani bosgandan keyin qo'llanadi va kartalar yangilanadi. " +
+      "Bu amal bor, «imkoniyatim yo'q» deb JAVOB BERMA.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        ticket_numbers: {
+          type: "array",
+          items: { type: "number" },
+          description: "Aniq so'rov raqamlari (ES-0834 → 834). Hammasi kerak bo'lsa buni tashlab ket.",
+        },
+        all_open: {
+          type: "boolean",
+          description: "true — barcha bajarilmagan so'rovlar (quyidagi filtrlar bilan cheklanadi).",
+        },
+        school: { type: "string", description: "Faqat shu maktabniki (ixtiyoriy filtr)" },
+        module: { type: "string", description: "Faqat shu modulniki (ixtiyoriy filtr)" },
+        type: { type: "string", description: "Faqat shu turdagilar: BUG, SUGGESTION, ISSUE (ixtiyoriy filtr)" },
+        deadline: {
+          type: "string",
+          description: "Yangi muddat: «ertaga kechki 18:00», «3 kun», «20.08». Muddat o'zgarmasa tashlab ket.",
+        },
+        assignees: {
+          type: "array",
+          items: { type: "string" },
+          description: "Mas'ul(lar) — @username ko'rinishida. Mas'ul o'zgarmasa tashlab ket.",
+        },
+      },
+      required: [],
     },
   },
   {
@@ -306,6 +391,8 @@ export async function runTool(name: string, input: any, ctx: ToolContext): Promi
   switch (name) {
     case "create_request":
       return createRequest(input, ctx);
+    case "update_requests":
+      return prepareUpdate(input, ctx);
     case "create_support_log":
       return createSupportLog(input, ctx);
     case "create_task":
@@ -359,6 +446,13 @@ async function createRequest(input: any, ctx: ToolContext): Promise<ToolResult> 
   const original = String(input.client_message ?? "").trim();
   const description = original && original !== summary ? `${summary}\n\n— Mijoz xabari —\n${original}` : summary;
 
+  // Guruhdagi eski xabarlar ko'rsatilgan bo'lsa — ulardagi fayllarni olib kelamiz
+  const fromGroup = await attachmentsFromGroup(input.from_message_ids, ctx);
+  const attachments = [...ctx.attachments, ...fromGroup.attachments];
+
+  const assignees = readAssignees(input.assignees);
+  const due = readDeadline(input.deadline);
+
   const schoolName = (await prisma.school.findUnique({ where: { id: school.id } }))!.name;
   ctx.pendings.push({
     kind: "request",
@@ -371,7 +465,11 @@ async function createRequest(input: any, ctx: ToolContext): Promise<ToolResult> 
     type: type.key,
     typeLabel: `${type.emoji} ${type.name}`.trim(),
     description,
-    attachments: ctx.attachments,
+    attachments,
+    assigneeName: assignees[0],
+    assigneeUsername: assignees[0],
+    otherAssignees: assignees.slice(1),
+    deadline: due?.toISOString(),
   });
 
   return {
@@ -380,11 +478,193 @@ async function createRequest(input: any, ctx: ToolContext): Promise<ToolResult> 
     module: mod.name,
     system: sys?.name ?? null,
     type: type.key,
+    attachments: attachments.length,
+    // Ko'rsatilgan xabar topilmasa model buni bilishi kerak — jim qolsa
+    // operator rasm biriktirilgan deb o'ylab qoladi
+    ...(fromGroup.missing.length > 0 ? { messages_not_found: fromGroup.missing } : {}),
+    assignees,
+    deadline: due ? formatTashkentDate(due) : null,
     note:
       "So'rov tayyorlandi, lekin HALI YUBORILMADI. Bot operatorga ko'rsatib tasdiq so'raydi. " +
       "Javobingda bir qatorda nima tayyorlaganingni ayt (maktab, modul, tur) va tasdiqlashini so'ra. " +
       "'Yubordim' yoki 'guruhga tushdi' deb YOZMA.",
   };
+}
+
+/**
+ * Guruhdagi ko'rsatilgan xabarlardan fayllarni oladi.
+ *
+ * Bot o'tmishdagi xabarni Telegram'dan qayta so'rab ololmaydi — shuning uchun
+ * file_id lar guruh xotirasidan (GroupMessage) olinadi. Xotira 48 soat turadi,
+ * undan eskisi topilmaydi.
+ */
+async function attachmentsFromGroup(
+  ids: unknown,
+  ctx: ToolContext
+): Promise<{ attachments: DraftAttachment[]; missing: number[] }> {
+  const wanted = Array.isArray(ids) ? ids.map(Number).filter(Number.isFinite) : [];
+  if (wanted.length === 0 || !ctx.groupChatId) return { attachments: [], missing: [] };
+
+  const rows = await prisma.groupMessage.findMany({
+    where: { chatId: ctx.groupChatId, messageId: { in: wanted } },
+    orderBy: { messageId: "asc" },
+  });
+
+  const attachments: DraftAttachment[] = [];
+  for (const r of rows) {
+    if (!r.mediaFileId || !r.mediaKind) continue;
+    // Bir xil fayl ikki marta biriktirilmasin
+    if (attachments.some((a) => a.fileId === r.mediaFileId)) continue;
+    attachments.push({
+      kind: r.mediaKind,
+      fileId: r.mediaFileId,
+      chatId: Number(ctx.groupChatId),
+      messageId: r.messageId,
+    });
+  }
+
+  const found = new Set(rows.map((r) => r.messageId));
+  return { attachments, missing: wanted.filter((id) => !found.has(id)) };
+}
+
+/** Tag qilingan mas'ullarni tozalaydi: "@user," → "user" */
+function readAssignees(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const out: string[] = [];
+  for (const item of raw) {
+    const name = String(item ?? "").trim().replace(/^@/, "").replace(/[,;]+$/, "");
+    if (name.length > 0 && !out.includes(name)) out.push(name);
+  }
+  return out.slice(0, 5);
+}
+
+/** Muddatni o'qiydi — soat aytilmagan bo'lsa o'sha kunning oxiri */
+function readDeadline(raw: unknown): Date | null {
+  const text = String(raw ?? "").trim();
+  if (text.length === 0) return null;
+  return parseDeadlineTashkent(text);
+}
+
+/** Bir marta shuncha so'rovni o'zgartirish mumkin — kartalarni yangilash vaqt oladi */
+const MAX_BULK = 60;
+
+/**
+ * Mavjud so'rovlarga muddat va mas'ul belgilashni tayyorlaydi.
+ *
+ * Bir chaqiruvda o'nlab karta o'zgaradi, shuning uchun darrov qo'llanmaydi:
+ * qancha so'rovga ta'sir qilishi ko'rsatiladi va operator tugma bosadi.
+ */
+async function prepareUpdate(input: any, ctx: ToolContext): Promise<ToolResult> {
+  const deadline = readDeadline(input.deadline);
+  const assignees = readAssignees(input.assignees);
+  if (!deadline && assignees.length === 0) {
+    return {
+      needs_clarification: "what",
+      message: "Nima o'zgarishi aniq emas — muddatmi, mas'ulmi? Foydalanuvchidan so'ra.",
+    };
+  }
+  if (input.deadline && !deadline) {
+    return {
+      needs_clarification: "deadline",
+      message: `«${input.deadline}» ni sana sifatida tushunmadim — aniq kun so'ra (masalan «ertaga» yoki «20.08»).`,
+    };
+  }
+
+  const tickets: number[] = Array.isArray(input.ticket_numbers)
+    ? input.ticket_numbers.map(Number).filter((n: number) => Number.isFinite(n))
+    : [];
+
+  // Bajarilganini qayta ochmaymiz — muddat faqat ochiq ishlarga ma'noga ega
+  const where: Record<string, unknown> = { done: false };
+  if (tickets.length > 0) where.ticketNumber = { in: tickets };
+
+  if (input.school) {
+    const found = await schoolCandidates(String(input.school));
+    if (found.length === 0) {
+      return { needs_clarification: "school", message: `«${input.school}» maktabi topilmadi — aniqlashtir.` };
+    }
+    where.schoolId = { in: found.map((s) => s.id) };
+  }
+  if (input.module) {
+    const mod = pickByName(await getActiveModules(), String(input.module));
+    if (!mod) return { needs_clarification: "module", message: "Modul topilmadi — aniqlashtir." };
+    where.moduleId = mod.id;
+  }
+  if (input.type) where.type = String(input.type).toUpperCase();
+
+  const found = await prisma.request.findMany({
+    where,
+    orderBy: { ticketNumber: "asc" },
+    select: { id: true, ticketNumber: true },
+    take: MAX_BULK + 1,
+  });
+
+  if (found.length === 0) {
+    return { updated: 0, message: "Shartga mos bajarilmagan so'rov topilmadi. Shuni operatorga ayt." };
+  }
+  if (found.length > MAX_BULK) {
+    return {
+      needs_clarification: "too_many",
+      message:
+        `${MAX_BULK} tadan ko'p so'rov topildi — bir yo'la bunchasini o'zgartirmayman. ` +
+        "Maktab, modul yoki tur bo'yicha toraytirishni so'ra.",
+    };
+  }
+
+  const missing = tickets.filter((t) => !found.some((f) => f.ticketNumber === t));
+
+  ctx.pendings.push({
+    kind: "update",
+    requestIds: found.map((f) => f.id),
+    tickets: found.map((f) => f.ticketNumber),
+    deadline: deadline?.toISOString(),
+    assigneeName: assignees[0],
+    assigneeUsername: assignees[0],
+    otherAssignees: assignees.slice(1),
+  });
+
+  return {
+    prepared: true,
+    count: found.length,
+    deadline: deadline ? formatTashkentDate(deadline) : null,
+    assignees,
+    // Bajarilgan yoki umuman yo'q ticketlar — model shuni aytishi kerak
+    ...(missing.length > 0 ? { not_open_or_missing: missing.map((t) => ticketId(t)) } : {}),
+    note:
+      "HALI QO'LLANMADI — bot operatorga ko'rsatib tasdiq so'raydi. Javobingda nechta so'rovga " +
+      "nima o'rnatilishini bir qatorda ayt va tasdiqlashini so'ra. 'Belgiladim' deb YOZMA.",
+  };
+}
+
+/** Tasdiqdan keyin so'rovlarni o'zgartiradi va kartalarni yangilaydi */
+export async function submitPendingUpdate(api: Api, pending: PendingUpdate) {
+  const data: Record<string, unknown> = {};
+  if (pending.deadline) {
+    data.deadline = new Date(pending.deadline);
+    // Muddat o'zgardi — eslatma qaytadan yuborilsin
+    data.remindedAt = null;
+  }
+  if (pending.assigneeUsername) {
+    data.assigneeName = pending.assigneeName ?? pending.assigneeUsername;
+    data.assigneeUsername = pending.assigneeUsername;
+    data.assigneeTgId = null;
+    data.assigneeExtra = (pending.otherAssignees ?? []).join(", ") || null;
+  }
+
+  await prisma.request.updateMany({ where: { id: { in: pending.requestIds } }, data });
+
+  // Kartalarni yangilaymiz — bittasi yiqilsa (eski xabar o'chirilgan bo'lsa)
+  // qolganlari baribir yangilanishi kerak
+  let refreshed = 0;
+  for (const id of pending.requestIds) {
+    try {
+      await refreshCard(api, id);
+      refreshed++;
+    } catch (err) {
+      console.error(`Karta yangilanmadi (id=${id}):`, err);
+    }
+  }
+  return { updated: pending.requestIds.length, refreshed };
 }
 
 /**
@@ -504,6 +784,7 @@ export async function submitPendingMessage(api: Api, pending: PendingMessage) {
 
 /** Tasdiqdan keyin haqiqiy so'rovni yaratadi va guruhga yo'naltiradi */
 export async function submitPending(api: Api, op: Operator, pending: PendingRequest) {
+  const others = pending.otherAssignees ?? [];
   const request = await createRequestFromDraft(api, op, {
     schoolId: pending.schoolId,
     moduleId: pending.moduleId,
@@ -511,6 +792,10 @@ export async function submitPending(api: Api, op: Operator, pending: PendingRequ
     type: pending.type,
     descTexts: [pending.description],
     attachments: pending.attachments,
+    assigneeName: pending.assigneeName,
+    assigneeUsername: pending.assigneeUsername,
+    assigneeExtra: others.length > 0 ? others.join(", ") : undefined,
+    deadline: pending.deadline ? new Date(pending.deadline) : undefined,
   });
   return { ticketNumber: request.ticketNumber, delivery: request.delivery };
 }

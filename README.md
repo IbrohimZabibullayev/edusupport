@@ -103,7 +103,54 @@ Guruh chatida bot faqat chaqirilganda aralashadi — uch yo'l bilan:
    ...
 ```
 
-Boshqa guruh xabarlariga javob bermaydi. Guruhda suhbat tarixi saqlanmaydi — uzluksizlik reply orqali beriladi: javob berilayotgan xabar kontekst sifatida qo'shiladi. Ro'yxatdan o'tmagan odamga bot avval shaxsiy chatda `/start` qilishni aytadi.
+Boshqa guruh xabarlariga javob bermaydi. Suhbat tarixi har bir odam uchun alohida saqlanadi (sessiya kaliti `chat:user`) — shuning uchun bot «qaysi maktab?» deb so'raganda javobingizni bog'lay oladi. Ro'yxatdan o'tmagan odamga bot avval shaxsiy chatda `/start` qilishni aytadi.
+
+#### Bir necha xabarni bitta so'rovga yig'ish
+
+Guruhda muammo odatda bo'lak-bo'lak keladi: biri skrinshot tashlaydi, ikkinchisi mijoz matnini forward qiladi, uchinchisi mas'ullarni tag qiladi. Bularning hech biri bot orqali o'tmagan.
+
+Bot guruhdagi xabarlarni **48 soat eslab turadi** (`GroupMessage`), shuning uchun keyin shunchaki ayta qolasiz:
+
+```
+👤 girgitton yuqoridagi xabarlarni Najot Ta'lim uchun so'rov qilib saqlab qo'y,
+   mas'ullar tag qilinganlar, bajarilmaguncha eslatib tur
+
+🤖 [skrinshot bilan birga]
+   Najot Ta'lim, Moliya bo'yicha BUG so'rovi tayyor — tasdiqlaysizmi?
+   ━━━━━━━━━━━━━━━━
+   🐞 Bug · 🧩 Moliya · 🏫 Najot Ta'lim
+   💬 Ota-onalar ilovadan to'lov qila olmayapti — Payme/Click chiqmayapti...
+   🙋 Mas'ul: @Abduraxmonov_Dostonbek, @xolmatov_dev
+   ⏰ Muddat: 15/08/2026 — bajarilgunicha eslatib turaman
+   📎 1 ta fayl
+   ━━━━━━━━━━━━━━━━
+   [ ✅ Guruhga yuborish ]  [ ❌ Bekor qilish ]
+```
+
+Xabar raqamini yozish, reply qilish yoki nechtaligini sanash shart emas — bot oxirgi 15 ta xabarni ko'radi va mavzuga tegishlilarini o'zi tanlaydi. Rasm/video o'sha xabarlardan olinadi, tag qilinganlar mas'ul bo'ladi, muddat qo'yilsa har kuni eslatib turiladi.
+
+> Buning ishlashi uchun **bot guruhda admin bo'lishi** kerak — aks holda Telegram unga oddiy guruh xabarlarini bermaydi. `/guruh` buni tekshiradi.
+
+#### Mavjud so'rovlarga muddat va mas'ul
+
+Yaratilgan so'rovlarni ham bitta gap bilan boshqarasiz — bittasini ham, hammasini ham:
+
+```
+👤 barcha bajarilmagan tasklarga ertaga kechki 18:00 gacha muddat belgila
+   va mas'ul qilib @Abduraxmonov_Dostonbek @IqboljonUnical ni qo'y
+
+🤖 11 ta bajarilmagan so'rovga muddat va mas'ul tayyorlandi — tasdiqlaysizmi?
+   ━━━━━━━━━━━━━━━━
+   📌 11 ta bajarilmagan so'rov
+   ⏰ Muddat: 15/08/2026 — bajarilgunicha eslatib turaman
+   🙋 Mas'ul: @Abduraxmonov_Dostonbek, @IqboljonUnical
+
+   ES-0930, ES-0931, ES-0932, ...
+   ━━━━━━━━━━━━━━━━
+   [ ✅ Belgilash ]  [ ❌ Bekor qilish ]
+```
+
+Maktab, modul yoki tur bo'yicha toraytirsa ham bo'ladi («Moliya bo'yicha ochiq so'rovlarni Dostonbekka ber»). Tasdiqlangach guruhdagi kartalar ham yangilanadi. Bir yo'la 60 tadan ko'p bo'lsa bot toraytirishni so'raydi.
 
 > «Vazifa» so'zi ikki xil ma'noda ishlatilgani uchun bot ikkalasini ham tekshiradi: **so'rovlar** (dasturchilarga yuborilgan) va **shaxsiy eslatmalar** (meeting, qo'ng'iroq). Shaxsiy ro'yxat bo'sh bo'lsa «hech narsa yo'q» demaydi — so'rovlarni ham qaraydi.
 
@@ -120,9 +167,10 @@ Boshqa guruh xabarlariga javob bermaydi. Guruhda suhbat tarixi saqlanmaydi — u
 
 ➡️ Xabarlar shu yerga ketadi: Dasturchilar guruhi
 ✅ Bog'lanish bor: Devs
+👀 Guruh xabarlarini ko'ryapman (xotirada 34 ta).
 ```
 
-Sozlangani yetarli emas — bot guruhda turgani ham tekshiriladi. Bot chiqarilgan yoki guruh superguruhga aylanib ID o'zgargan bo'lsa shu yerda ko'rinadi.
+Sozlangani yetarli emas — bot guruhda turgani ham tekshiriladi. Bot chiqarilgan yoki guruh superguruhga aylanib ID o'zgargan bo'lsa shu yerda ko'rinadi. Oxirgi qator bot guruh xabarlarini ko'ra olayotganini aytadi; admin bo'lmasa «yuqoridagi xabarlarni so'rov qil» ishlamaydi va shu yerda ogohlantiriladi.
 
 ### Model va xarajat
 

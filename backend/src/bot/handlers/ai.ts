@@ -2,11 +2,12 @@ import { InlineKeyboard } from "grammy";
 import { Message } from "grammy/types";
 import { AiTurn, runAgent } from "../../ai/agent";
 import { aiEnabled } from "../../ai/client";
-import { Pending, submitPending, submitPendingMessage } from "../../ai/tools";
+import { Pending, PendingUpdate, submitPending, submitPendingMessage, submitPendingUpdate } from "../../ai/tools";
 import { prisma } from "../../db";
-import { escapeHtml } from "../../util";
+import { escapeHtml, formatTashkentDate, ticketId } from "../../util";
 import { menu } from "../keyboards";
 import { clientKeyOf, findClientSource } from "../services/clients";
+import { formatGroupContext, recentGroupMessages } from "../services/groupLog";
 import { deliveryLine } from "../services/notify";
 import { sendCard } from "../services/sendCard";
 import { persistSession } from "../session";
@@ -239,9 +240,31 @@ async function showConfirm(ctx: MyContext, aiText: string, ps: Pending[], thread
 }
 
 function confirmKeyboard(ps: Pending[]): InlineKeyboard {
-  const onlyMessages = ps.every((p) => p.kind === "message");
-  const label = ps.length > 1 ? `✅ Hammasini yuborish (${ps.length})` : onlyMessages ? "✅ Yuborish" : "✅ Guruhga yuborish";
+  const label =
+    ps.length > 1
+      ? `✅ Hammasini bajarish (${ps.length})`
+      : ps[0].kind === "message"
+        ? "✅ Yuborish"
+        : ps[0].kind === "update"
+          ? "✅ Belgilash"
+          : "✅ Guruhga yuborish";
   return new InlineKeyboard().text(label, "ai:send").row().text("❌ Bekor qilish", "ai:cancel");
+}
+
+/** Ommaviy o'zgartirishning ko'rinishi */
+function previewUpdate(aiText: string, p: PendingUpdate): string[] {
+  const who = [p.assigneeUsername, ...(p.otherAssignees ?? [])].filter(Boolean) as string[];
+  const shown = p.tickets.slice(0, 12).map((t) => ticketId(t)).join(", ");
+  const rest = p.tickets.length > 12 ? ` va yana ${p.tickets.length - 12} ta` : "";
+  return [
+    `📌 <b>${p.tickets.length} ta bajarilmagan so'rov</b>`,
+    ...(p.deadline
+      ? [`⏰ <b>Muddat:</b> ${formatTashkentDate(new Date(p.deadline))} — bajarilgunicha eslatib turaman`]
+      : []),
+    ...(who.length > 0 ? [`🙋 <b>Mas'ul:</b> ${who.map((u) => `@${escapeHtml(u)}`).join(", ")}`] : []),
+    "",
+    `<code>${escapeHtml(shown)}</code>${escapeHtml(rest)}`,
+  ];
 }
 
 /** Bir necha amal tayyorlangan bo'lsa hammasini bitta ko'rinishda beramiz */
@@ -252,6 +275,9 @@ function previewAll(aiText: string, ps: Pending[]): string {
     if (p.kind === "message") {
       const who = p.targets.map((t) => t.label).join(", ");
       return [`<b>${i + 1}.</b> 📨 ${escapeHtml(who)}`, escapeHtml(p.text)].join("\n");
+    }
+    if (p.kind === "update") {
+      return [`<b>${i + 1}.</b>`, ...previewUpdate("", p)].join("\n");
     }
     return [
       `<b>${i + 1}.</b> ${escapeHtml(p.typeLabel)} — ${escapeHtml(p.schoolName)}, ${escapeHtml(p.moduleName)}`,
@@ -271,6 +297,18 @@ function previewAll(aiText: string, ps: Pending[]): string {
 }
 
 function previewText(aiText: string, p: Pending): string {
+  if (p.kind === "update") {
+    return [
+      aiText ? escapeHtml(aiText) : "O'zgartirish tayyorlandi.",
+      "",
+      "━━━━━━━━━━━━━━━━",
+      ...previewUpdate(aiText, p),
+      "━━━━━━━━━━━━━━━━",
+      "",
+      "Belgilaymi?",
+    ].join("\n");
+  }
+
   if (p.kind === "message") {
     const many = p.targets.length > 3;
     const who = many
@@ -300,6 +338,13 @@ function previewText(aiText: string, p: Pending): string {
     "",
     `💬 ${escapeHtml(p.description)}`,
   ];
+
+  const who = [p.assigneeUsername, ...(p.otherAssignees ?? [])].filter(Boolean) as string[];
+  if (who.length > 0) lines.push("", `🙋 <b>Mas'ul:</b> ${who.map((u) => `@${escapeHtml(u)}`).join(", ")}`);
+  if (p.deadline) {
+    lines.push(`⏰ <b>Muddat:</b> ${formatTashkentDate(new Date(p.deadline))} — bajarilgunicha eslatib turaman`);
+  }
+
   if (p.attachments.length > 0) lines.push("", `📎 ${p.attachments.length} ta fayl`);
   lines.push("━━━━━━━━━━━━━━━━", "", "To'g'rimi? Tasdiqlasangiz guruhga yuboraman.");
   return lines.join("\n");
@@ -330,6 +375,12 @@ export async function handleAiSend(ctx: MyContext): Promise<void> {
         const { sent, failed } = await submitPendingMessage(ctx.api, p);
         people += sent;
         undelivered.push(...failed);
+      } else if (p.kind === "update") {
+        const { updated, refreshed } = await submitPendingUpdate(ctx.api, p);
+        lines.push(
+          `✅ ${updated} ta so'rovga belgilandi.` +
+            (refreshed < updated ? `\n<i>${updated - refreshed} ta kartani yangilay olmadim (xabar o'chirilgan bo'lishi mumkin).</i>` : "")
+        );
       } else {
         const { ticketNumber, delivery } = await submitPending(ctx.api, op, p);
         lines.push(deliveryLine(ticketNumber, delivery));
@@ -349,7 +400,7 @@ export async function handleAiSend(ctx: MyContext): Promise<void> {
     );
   }
 
-  await ctx.reply(lines.join("\n") || "Bajarildi.", { parse_mode: "HTML", reply_markup: menu() });
+  await ctx.reply(lines.join("\n") || "Bajarildi.", { parse_mode: "HTML", ...replyTarget(ctx) });
 }
 
 /** "❌ Bekor qilish" */
@@ -357,7 +408,18 @@ export async function handleAiCancel(ctx: MyContext): Promise<void> {
   ctx.session.aiPending = undefined;
   await ctx.answerCallbackQuery({ text: "Bekor qilindi" });
   await ctx.editMessageReplyMarkup({ reply_markup: undefined }).catch(() => undefined);
-  await ctx.reply("❌ Yuborilmadi. Nimani o'zgartiray?", { reply_markup: menu() });
+  await ctx.reply("❌ Yuborilmadi. Nimani o'zgartiray?", replyTarget(ctx));
+}
+
+/**
+ * Tugma bosilgan joyga qarab javob sozlamasi.
+ *
+ * Guruhda javob o'sha bo'limga tushishi kerak, va pastdagi klaviatura
+ * guruhga umuman tegishli emas — u faqat shaxsiy chatda ma'noga ega.
+ */
+function replyTarget(ctx: MyContext): { message_thread_id?: number; reply_markup?: ReturnType<typeof menu> } {
+  if (ctx.chat?.type === "private") return { reply_markup: menu() };
+  return { message_thread_id: ctx.callbackQuery?.message?.message_thread_id };
 }
 
 /**
@@ -386,10 +448,10 @@ export function isGroupMention(ctx: MyContext): boolean {
 /**
  * Guruhdagi murojaatga javob beradi.
  *
- * Guruhda suhbat tarixi saqlanmaydi — har murojaat mustaqil. Uzluksizlik
- * reply orqali beriladi: javob berilayotgan xabar matni kontekst sifatida
- * qo'shiladi, shuning uchun "girgitton bu bajarildimi?" kabi savollar ham
- * tushunarli bo'ladi.
+ * Suhbat tarixi guruhda ham saqlanadi, lekin har bir odam uchun alohida
+ * (sessiya kaliti "chat:user"). Busiz aniqlashtiruvchi savol tugab qolardi:
+ * bot "qaysi maktab?" deb so'raydi, operator javob yozadi, bot esa nima
+ * haqida gaplashayotganini eslay olmaydi.
  */
 export async function handleGroupMention(ctx: MyContext): Promise<void> {
   const msg = ctx.message;
@@ -423,15 +485,25 @@ export async function handleGroupMention(ctx: MyContext): Promise<void> {
     parts.push("", `--- ${who} ---`, repliedText.slice(0, 1500), "--- tugadi ---");
   }
 
+  // Bir necha xabarga bo'lingan muammoni yig'ish uchun — oxirgi xabarlar raqami
+  // bilan beriladi, model keraklisini o'zi tanlaydi
+  const recent = await recentGroupMessages(ctx.chat!.id, msg.message_thread_id, msg.message_id);
+  const context = formatGroupContext(recent);
+  if (context) parts.push(context);
+
   await ctx.api.sendChatAction(ctx.chat!.id, "typing").catch(() => undefined);
 
   try {
     const result = await runAgent({
       api: ctx.api,
       operator: op,
-      history: [],
+      history: freshHistory(ctx),
       userText: parts.join("\n"),
+      groupChatId: String(ctx.chat!.id),
+      groupThreadId: msg.message_thread_id,
     });
+
+    ctx.session.ai = { history: trimHistory(result.history), lastAt: Date.now() };
 
     // Guruhda so'rov tayyorlansa ham tasdiq shaxsiy chatdagidek tugma bilan
     if (result.pendings.length > 0) {

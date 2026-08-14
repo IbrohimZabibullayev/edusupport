@@ -19,11 +19,27 @@ export const cardInclude = { system: true, module: true, school: true, operator:
  * @username orqali tayinlanganda Telegram ID bermaydi — o'shanda username bilan
  * tag qilamiz; ID bo'lsa (tugma yoki text_mention) havola bilan.
  */
-export function mentionAssignee(r: Pick<Request, "assigneeTgId" | "assigneeName" | "assigneeUsername">): string {
+export function mentionAssignee(
+  r: Pick<Request, "assigneeTgId" | "assigneeName" | "assigneeUsername"> & { assigneeExtra?: string | null }
+): string {
   // ID barqarorroq (username o'zgarishi mumkin), shuning uchun avval o'sha
-  if (r.assigneeTgId) return `<a href="tg://user?id=${r.assigneeTgId}">${escapeHtml(r.assigneeName ?? "mas'ul")}</a>`;
-  if (r.assigneeUsername) return `@${escapeHtml(r.assigneeUsername)}`;
-  return "";
+  const main = r.assigneeTgId
+    ? `<a href="tg://user?id=${r.assigneeTgId}">${escapeHtml(r.assigneeName ?? "mas'ul")}</a>`
+    : r.assigneeUsername
+      ? `@${escapeHtml(r.assigneeUsername)}`
+      : "";
+  // Qo'shimcha mas'ullar ham eslatmada tag qilinishi kerak — aks holda ular
+  // o'zlariga tegishli ish borligini bilmay qoladi
+  const extra = splitExtra(r.assigneeExtra).map((u) => `@${escapeHtml(u)}`);
+  return [main, ...extra].filter(Boolean).join(" ");
+}
+
+/** "a, b" → ["a", "b"] */
+export function splitExtra(value?: string | null): string[] {
+  return (value ?? "")
+    .split(",")
+    .map((s) => s.trim().replace(/^@/, ""))
+    .filter((s) => s.length > 0);
 }
 
 function deadlineLine(r: CardRequest): string {
@@ -46,7 +62,9 @@ export async function renderCardText(r: CardRequest): Promise<string> {
       : r.assigneeUsername
         ? `@${escapeHtml(r.assigneeUsername)}`
         : escapeHtml(r.assigneeName ?? "");
-  const assignee = assigneeLabel ? `🙋 Mas'ul: ${assigneeLabel}` : "";
+  const extras = splitExtra(r.assigneeExtra).map((u) => `@${escapeHtml(u)}`);
+  const allAssignees = [assigneeLabel, ...extras].filter(Boolean).join(", ");
+  const assignee = allAssignees ? `🙋 Mas'ul: ${allAssignees}` : "";
 
   return [
     ...(r.done ? [`✅ <b>BAJARILDI</b> — ${escapeHtml(r.doneByName ?? "—")} · ${formatSpan(r.createdAt, r.doneAt ?? new Date())}`, ""] : []),

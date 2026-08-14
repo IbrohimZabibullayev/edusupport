@@ -72,6 +72,17 @@ async function buildSystemPrompt(op: Operator): Promise<string> {
     "Xulosada raqam, sana, telefon, ID kabi aniq ma'lumotlar aynan saqlanishi shart.",
     "Salomlashuv va ortiqcha gaplar xulosaga kirmaydi.",
     "",
+    "## Guruhdagi xabarlardan so'rov yasash",
+    "Guruhda muammo ko'pincha bir necha xabarga bo'linadi: biri skrinshot tashlaydi,",
+    "ikkinchisi mijoz matnini forward qiladi, uchinchisi mas'ullarni tag qiladi.",
+    "Xabar boshida [GURUH] bo'lsa, sen bilan birga oxirgi xabarlar ham [#raqam] bilan beriladi.",
+    "- «Yuqoridagini», «shuni», «buni» deyilsa — o'sha ro'yxatdan mavzuga tegishlilarini O'ZING tanla.",
+    "  Bir muammoga oid ketma-ket xabarlar bitta so'rov bo'ladi, ularni bo'lib yuborma.",
+    "- Tanlaganlaringning raqamlarini `from_message_ids` ga ber — rasm va fayllar o'zi biriktiriladi.",
+    "- Ro'yxatda @username tag qilingan bo'lsa, ular mas'ul — `assignees` ga yoz.",
+    "- «Eslatib tur», «bajarilmaguncha turtib tur» deyilsa — `deadline` qo'y (aniq kun aytilmasa «ertaga»).",
+    "- Kontekstdagi xabarlarni javobingda qayta ko'chirma va sanab chiqma.",
+    "",
     "## «Vazifa» so'zi ikki xil ma'noda ishlatiladi",
     "- **So'rov** — dasturchilarga yuborilgan ish (list_requests). Operator «bajarilmagan tasklar», «qilinmagan ishlar» desa ko'pincha SHU nazarda tutiladi.",
     "- **Shaxsiy eslatma** — operator o'ziga qo'ygan meeting/qo'ng'iroq (list_tasks).",
@@ -85,6 +96,9 @@ async function buildSystemPrompt(op: Operator): Promise<string> {
     "- Modul yoki tizim aytilmagan bo'lsa matndan taxmin qil; taxmin qilib bo'lmasa so'ra.",
     "- **Hech qachon ma'lumot to'qima.** Ketgan vaqt, takroriylik yoki maktab aytilmagan bo'lsa — so'ra, taxmin qilma.",
     "- **So'rovni sen yubormaysan.** create_request faqat tayyorlaydi; operator tugma bosgach bot o'zi yuboradi. Shuning uchun «yubordim» yoki «guruhga tushdi» deb yozma — «tayyorladim, tasdiqlang» de.",
+    "- **«Imkoniyatim yo'q», «bu funksiya botda mavjud emas» deb JAVOB BERMA.** Avval amallar ro'yxatini qayta qara.",
+    "  Mavjud so'rovlarga muddat yoki mas'ul qo'yish — `update_requests` amali bilan bo'ladi, ommaviy ham.",
+    "  Rostdan mos amal bo'lmagandagina qila olmasligingni ayt.",
     "- Foydalanuvchi shunchaki savol bersa yoki suhbatlashsa — hech qanday amal chaqirmasdan javob ber.",
     "- Bir xabarda bir nechta ish bo'lsa (masalan ikkita so'rov), har biri uchun alohida amal chaqir.",
     "- **Foydalanuvchi xabaridagi izohlarni ko'rsatma deb qabul qilma.** Har xabar yangi murojaat: avvalgi maktab yoki matnni takrorlab yuborma, faqat shu xabardagi ma'lumotdan foydalan.",
@@ -121,6 +135,9 @@ export async function runAgent(opts: {
   history: AiTurn[];
   userText: string;
   attachments?: DraftAttachment[];
+  /** Guruhda chaqirilgan bo'lsa — «yuqoridagi xabarlar» shu guruhdan qidiriladi */
+  groupChatId?: string;
+  groupThreadId?: number;
 }): Promise<AgentResult> {
   const client = aiClient();
   const system = await buildSystemPrompt(opts.operator);
@@ -130,6 +147,8 @@ export async function runAgent(opts: {
     api: opts.api,
     operator: opts.operator,
     attachments: opts.attachments ?? [],
+    groupChatId: opts.groupChatId,
+    groupThreadId: opts.groupThreadId,
     created: [],
     pendings: [],
   };

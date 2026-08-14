@@ -97,6 +97,7 @@ import {
   startTaskWizard,
 } from "./handlers/tasks";
 import { getActiveRequestTypes, requestTypeLabel } from "./services/requestTypes";
+import { recordGroupMessage } from "./services/groupLog";
 import { learnTopic } from "./services/topics";
 import { resolveGroupChat } from "../ai/tools";
 import { sessionMiddleware } from "./session";
@@ -404,6 +405,14 @@ function createBot(): Bot<MyContext> {
   bot.callbackQuery(/^rq:dueset:(\d+):(-?\d+)$/, (ctx) => handleDueSet(ctx, Number(ctx.match[1]), Number(ctx.match[2])));
   bot.callbackQuery(/^rq:back:(\d+)$/, (ctx) => handleCardBack(ctx, Number(ctx.match[1])));
 
+  // Guruhdagi xabarlarni qisqa muddat eslab qolamiz — keyin «girgitton, yuqoridagi
+  // xabarlarni so'rov qil» deyilganda o'sha xabarlar (rasm bilan birga) topiladi.
+  // Hech nimani to'xtatmaydi, faqat yozib qo'yadi.
+  bot.on("message", async (ctx, next) => {
+    if (ctx.chat.type !== "private") await recordGroupMessage(ctx);
+    await next();
+  });
+
   // Guruhda botning "kimga berasiz?" so'roviga reply kelsa — mas'ulni tag'dan o'qiymiz
   bot.on("message", async (ctx, next) => {
     if (ctx.chat.type !== "private" && (await handleAssignReply(ctx))) return;
@@ -415,6 +424,19 @@ function createBot(): Bot<MyContext> {
   const groupAi = bot.filter((ctx) => aiAvailable() && isGroupMention(ctx));
   groupAi.use(sessionMiddleware);
   groupAi.on("message", handleGroupMention);
+
+  // Assistentning tasdiq tugmasi guruhda ham bosiladi — shuning uchun u ham
+  // "faqat shaxsiy chat" filtridan OLDIN turishi kerak. Aks holda guruhdagi
+  // "✅ Guruhga yuborish" tugmasi hech qanday javob bermaydi.
+  const groupConfirm = bot.filter(
+    (ctx) =>
+      ctx.chat !== undefined &&
+      ctx.chat.type !== "private" &&
+      (ctx.callbackQuery?.data === "ai:send" || ctx.callbackQuery?.data === "ai:cancel")
+  );
+  groupConfirm.use(sessionMiddleware);
+  groupConfirm.callbackQuery("ai:send", handleAiSend);
+  groupConfirm.callbackQuery("ai:cancel", handleAiCancel);
 
   // Qolgan hamma narsa faqat shaxsiy chatda
   bot.use(async (ctx, next) => {
@@ -471,6 +493,20 @@ function createBot(): Bot<MyContext> {
       try {
         const chat = await ctx.api.getChat(target.chatId);
         lines.push(`✅ Bog'lanish bor: ${"title" in chat ? chat.title : target.chatId}`);
+
+        // "Yuqoridagi xabarlarni so'rov qil" faqat bot o'sha xabarlarni ko'rgan
+        // bo'lsa ishlaydi. Bot admin bo'lmasa Telegram unga guruhdagi oddiy
+        // xabarlarni bermaydi — buni oldindan aytib qo'yamiz.
+        const me = await ctx.api.getChatMember(target.chatId, ctx.me.id);
+        const seen = await prisma.groupMessage.count({ where: { chatId: target.chatId } });
+        if (me.status === "administrator" || me.status === "creator") {
+          lines.push(`👀 Guruh xabarlarini ko'ryapman (xotirada ${seen} ta).`);
+        } else {
+          lines.push(
+            "⚠️ Bot guruhda admin emas — oddiy xabarlarni ko'rmaydi.",
+            "<i>«Girgitton, yuqoridagi xabarlarni so'rov qil» ishlashi uchun botni admin qiling.</i>"
+          );
+        }
       } catch (err) {
         lines.push(
           "❌ Bog'lana olmadim — bot guruhdan chiqarilgan yoki ID eskirgan.",

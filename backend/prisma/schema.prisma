@@ -124,6 +124,32 @@ model OperatorTask {
   @@index([dueAt])
 }
 
+/**
+ * Guruhdagi so'nggi xabarlar.
+ *
+ * Bot guruhda chaqirilganda "shu yuqoridagi xabarlarni so'rov qil" deyish
+ * uchun kerak: Telegram boti o'tmishdagi xabarlarni so'rab ololmaydi, faqat
+ * kelgan paytda ko'radi. Shuning uchun qisqa muddatga saqlab turamiz va
+ * eskisini tozalaymiz.
+ */
+model GroupMessage {
+  id           Int      @id @default(autoincrement())
+  chatId       String
+  threadId     Int?
+  messageId    Int
+  fromName     String
+  fromUsername String?
+  /** Xabar forward qilingan bo'lsa — kimdan (mijoz murojaatini ajratish uchun) */
+  forwardFrom  String?
+  text         String?
+  mediaKind    String?
+  mediaFileId  String?
+  createdAt    DateTime @default(now())
+
+  @@unique([chatId, messageId])
+  @@index([chatId, threadId, createdAt])
+}
+
 model School {
   id                  Int       @id @default(autoincrement())
   name                String    @unique
@@ -203,6 +229,8 @@ model Request {
   assigneeTgId     String?
   assigneeName     String?
   assigneeUsername String?
+  /** Qo'shimcha mas'ullar (vergul bilan, @ siz) — guruhda bir necha kishi tag qilinadi */
+  assigneeExtra    String?
   deadline         DateTime?
   /** Oxirgi eslatma yuborilgan payt — kuniga bir marta eslatish uchun */
   remindedAt       DateTime?

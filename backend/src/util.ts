@@ -126,6 +126,87 @@ export function parseWhenTashkent(text: string, now = new Date()): Date | null {
   return tashkentAt(year, month, day, hour, minute);
 }
 
+/**
+ * Hafta kunlari — "juma", "payshanbagacha" kabi muddatlar uchun (0 = yakshanba).
+ * Oxirida \b yo'q: o'zbekchada qo'shimcha qo'shiladi ("-gacha", "-da", "-ga").
+ * Tartib muhim — "shanba" oxirida turadi, aks holda "payshanba" ni yeb qo'yardi.
+ */
+const WEEKDAYS: [RegExp, number][] = [
+  [/\byakshanba/, 0],
+  [/\bdushanba/, 1],
+  [/\bseshanba/, 2],
+  [/\bchorshanba/, 3],
+  [/\bpayshanba/, 4],
+  [/\bjuma/, 5],
+  [/\bshanba/, 6],
+];
+
+/**
+ * Muddatni tushunadi — kun darajasida, soatsiz.
+ *
+ * `parseWhenTashkent` dan farqi: u soat talab qiladi ("ertaga 9:00"), muddat
+ * esa odatda soatsiz aytiladi ("ertaga", "3 kun", "jumagacha", "20.08").
+ * Natija — o'sha kunning oxiri (23:59), tugmalar orqali qo'yiladigan muddat
+ * bilan bir xil.
+ *
+ * Aniq soat aytilgan bo'lsa (masalan "ertaga 15:00") o'sha soat qaytadi.
+ */
+export function parseDeadlineTashkent(text: string, now = new Date()): Date | null {
+  const t = text.toLowerCase().trim().replace(/\s+/g, " ");
+  if (t.length === 0) return null;
+
+  // Soat ham aytilgan bo'lsa — aniqroq, o'shani ishlatamiz
+  if (/\d{1,2}:\d{2}/.test(t)) {
+    const exact = parseWhenTashkent(t, now);
+    if (exact) return exact;
+  }
+
+  const local = new Date(now.getTime() + TZ_OFFSET_MS);
+  const endOf = (plusDays: number) =>
+    new Date(
+      Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() + plusDays, 23, 59, 0) - TZ_OFFSET_MS
+    );
+
+  if (/\bbugun\b|\bshu kun\b/.test(t)) return endOf(0);
+  if (/\bertaga\b|\bertagacha\b/.test(t)) return endOf(1);
+  if (/\bindinga\b/.test(t)) return endOf(2);
+
+  // "3 kun", "3 kundan keyin", "2 hafta"
+  const span = t.match(/(\d{1,2})\s*(kun|hafta|oy)/);
+  if (span) {
+    const n = Number(span[1]);
+    if (n > 0 && n < 100) {
+      if (span[2] === "kun") return endOf(n);
+      if (span[2] === "hafta") return endOf(n * 7);
+      return endOf(n * 30);
+    }
+  }
+  if (/\bhafta\b/.test(t)) return endOf(7);
+
+  // "juma", "dushanbagacha" — shu hafta kelmagan bo'lsa keyingi hafta
+  for (const [re, target] of WEEKDAYS) {
+    if (!re.test(t)) continue;
+    const diff = (target - local.getUTCDay() + 7) % 7;
+    return endOf(diff === 0 ? 7 : diff);
+  }
+
+  // "20.08", "20.08.2026", "20/08"
+  const date = t.match(/\b(\d{1,2})[./](\d{1,2})(?:[./](\d{2,4}))?/);
+  if (date) {
+    const day = Number(date[1]);
+    const month = Number(date[2]) - 1;
+    if (month < 0 || month > 11 || day < 1 || day > 31) return null;
+    let year = local.getUTCFullYear();
+    if (date[3]) {
+      const y = Number(date[3]);
+      year = y < 100 ? 2000 + y : y;
+    }
+    return new Date(Date.UTC(year, month, day, 23, 59, 0) - TZ_OFFSET_MS);
+  }
+
+  return null;
+}
+
 /** Faqat soat: "14:30" (Asia/Tashkent) */
 export function formatTashkentTime(date: Date): string {
   return new Intl.DateTimeFormat("uz-UZ", {
