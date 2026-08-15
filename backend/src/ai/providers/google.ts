@@ -84,8 +84,16 @@ function toContents(turns: AiTurn[]): Content[] {
     }
     if (turn.role === "model") {
       const parts: Part[] = [];
-      if (turn.text) parts.push({ text: turn.text });
-      for (const c of turn.calls ?? []) parts.push({ functionCall: { name: c.name, args: c.input } });
+      if (turn.text) {
+        parts.push({ text: turn.text, ...(turn.signature ? { thoughtSignature: turn.signature } : {}) });
+      }
+      for (const c of turn.calls ?? []) {
+        // Imzo aynan o'sha partga qaytishi shart — 3.x modellari busiz 400 beradi
+        parts.push({
+          functionCall: { name: c.name, args: c.input },
+          ...(c.signature ? { thoughtSignature: c.signature } : {}),
+        });
+      }
       // Bo'sh part ro'yxati bilan Gemini 400 qaytaradi
       if (parts.length > 0) out.push({ role: "model", parts });
       continue;
@@ -105,9 +113,18 @@ function asRecord(value: unknown): Record<string, unknown> {
   return { result: value };
 }
 
+/**
+ * Sukutdagi model.
+ *
+ * `gemini-2.5-flash` ataylab tanlanmagan: Google uni yangi kalitlar uchun
+ * yopib qo'ygan va u 404 qaytaradi. Kalitingizga nima ochiqligini
+ * `npm run models` ko'rsatadi, almashtirish uchun AI_MODEL.
+ */
+const DEFAULT_MODEL = "gemini-3.7-flash";
+
 export const googleProvider: AiProvider = {
   name: "google",
-  model: config.aiModel || "gemini-2.5-flash",
+  model: config.aiModel || DEFAULT_MODEL,
 
   async step(system: string, turns: AiTurn[], tools: ToolSchema[]): Promise<ModelStep> {
     const response = await genai().models.generateContent({
@@ -137,11 +154,15 @@ export const googleProvider: AiProvider = {
         id: p.functionCall.id ?? `call_${turns.length}_${i}`,
         name: p.functionCall.name,
         input: (p.functionCall.args ?? {}) as Record<string, unknown>,
+        signature: p.thoughtSignature,
       });
     }
 
+    // Matn qismining imzosi (fikrlash qismidan tashqarisi)
+    const signature = parts.find((p) => typeof p.text === "string" && !p.thought)?.thoughtSignature;
+
     // Xavfsizlik filtri to'xtatgan bo'lsa matn ham, amal ham bo'lmaydi
     const blocked = response.candidates?.[0]?.finishReason === "SAFETY";
-    return { text, calls, refused: blocked };
+    return { text, calls, signature, refused: blocked };
   },
 };

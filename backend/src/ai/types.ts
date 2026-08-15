@@ -26,6 +26,14 @@ export interface AiToolCall {
   id: string;
   name: string;
   input: Record<string, unknown>;
+  /**
+   * Provayderning ichki imzosi — o'zgartirmasdan qaytariladi.
+   *
+   * Gemini 3.x fikrlaydigan modellari amal chaqiruviga `thoughtSignature`
+   * qo'shadi va tarixda o'sha imzo aynan qaytarilishini TALAB qiladi.
+   * Tashlab yuborilsa keyingi so'rov 400 bilan yiqiladi.
+   */
+  signature?: string;
 }
 
 export interface AiToolResult {
@@ -37,13 +45,15 @@ export interface AiToolResult {
 /** Suhbatning bir navbati */
 export type AiTurn =
   | { role: "user"; text: string }
-  | { role: "model"; text?: string; calls?: AiToolCall[] }
+  | { role: "model"; text?: string; calls?: AiToolCall[]; signature?: string }
   | { role: "tool"; results: AiToolResult[] };
 
 /** Modeldan kelgan bitta javob */
 export interface ModelStep {
   text: string;
   calls: AiToolCall[];
+  /** Matn qismining imzosi — `AiToolCall.signature` bilan bir maqsadda */
+  signature?: string;
   /** Model so'rovni bajarishdan bosh tortdi */
   refused?: boolean;
 }

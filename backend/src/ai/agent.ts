@@ -181,7 +181,7 @@ export async function runAgent(opts: {
     }
 
     text = response.text;
-    turns.push({ role: "model", text: response.text, calls: response.calls });
+    turns.push({ role: "model", text: response.text, calls: response.calls, signature: response.signature });
     if (response.calls.length === 0) break;
 
     // Barcha natijalar bitta navbatda qaytariladi

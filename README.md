@@ -199,7 +199,7 @@ Ikkalasi berilsa **Google ustun** turadi. Hech biri berilmasa assistent o'chadi 
 🤖 Assistent: google · gemini-2.5-flash
 ```
 
-Sukutdagi modellar: Google — `gemini-2.5-flash`, Anthropic — `claude-sonnet-5`. Kalitingizga qaysi modellar ochiqligini ko'rish uchun:
+Sukutdagi modellar: Google — `gemini-3.7-flash`, Anthropic — `claude-sonnet-5`. Kalitingizga qaysi modellar ochiqligini ko'rish uchun:
 
 ```bash
 cd backend && npm run models
@@ -207,7 +207,19 @@ cd backend && npm run models
 
 Ro'yxatdan birini tanlab `AI_MODEL` ga yozasiz — kodga tegish shart emas.
 
-**Provayder almashtirilganda ochiq suhbatlar buzilmaydi.** Ikkalasining xabar formati butunlay boshqacha, shuning uchun suhbat tarixi sessiyada neytral ko'rinishda saqlanadi (`src/ai/types.ts`) va har chaqiruvda kerakli formatga o'giriladi. Tanilmagan formatdagi eski tarix uchraса tashlab yuboriladi — suhbat yangidan boshlanadi, bu xatolikdan yaxshiroq.
+> ⚠️ **Bepul tarif limiti.** Google AI Studio bepul tarifida limit har bir model uchun alohida va juda tor — `gemini-3.7-flash` uchun **kuniga 20 ta so'rov**. Qo'llab-quvvatlash boti uchun bu yetmaydi: bir necha operator yarim soatda tugatadi. Ishlab chiqarish uchun Google Cloud'da to'lovni yoqish yoki limiti kengroq modelga o'tish kerak. Limit tugaganda bot operatorga «⏳ AI limiti tugadi» deb aytadi va tugmali rejimga yo'naltiradi — jim qolmaydi.
+
+O'lchangan natijalar (6 ta asosiy holat: so'rov yaratish, support log ajratish, mavhumlikni so'rash, reaksiya, ommaviy muddat, gap qisqaligi):
+
+| Model | To'g'ri | Tezlik |
+|---|---|---|
+| `gemini-3.7-flash` ← sukut | 6/6 | ~6.8s |
+| `gemini-3.5-flash-lite` | 6/6 | ~1.6s |
+| `gemini-2.5-flash` | — | 404, yangi kalitlarga yopilgan |
+
+**Provayder almashtirilganda ochiq suhbatlar buzilmaydi.** Ikkalasining xabar formati butunlay boshqacha, shuning uchun suhbat tarixi sessiyada neytral ko'rinishda saqlanadi (`src/ai/types.ts`) va har chaqiruvda kerakli formatga o'giriladi. Tanilmagan formatdagi eski tarix uchrasa tashlab yuboriladi — suhbat yangidan boshlanadi, bu xatolikdan yaxshiroq.
+
+Gemini 3.x fikrlaydigan modellari amal chaqiruviga `thoughtSignature` qo'shadi va tarixda o'sha imzo **aynan qaytarilishini talab qiladi** — tashlab yuborilsa keyingi so'rov 400 bilan yiqiladi. Imzo neytral tarixda `signature` maydonida saqlanadi va o'zgartirilmasdan qaytariladi.
 
 Anthropic yo'lida **prompt keshlash yoqilgan** — tizim prompti va amal sxemalari (~2900 token) har chaqiruvda 0.1x narxda o'qiladi, bu xarajatni ~3 baravar kamaytiradi. Sonnet 5 `effort: low` tanlangani o'lchov bilan asoslangan: 10 ta qiyin holatda Sonnet 5 low — 10/10 (~$76/oy), Haiku 4.5 — 9/10 (~$57/oy), eng oddiy holatda so'rov yaratmagan.
 

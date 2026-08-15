@@ -216,11 +216,32 @@ async function askAi(
     await ctx.reply(escapeHtml(result.text), { parse_mode: "HTML", reply_markup: menu() });
   } catch (err) {
     console.error("Assistent javob bera olmadi:", err);
-    await ctx.reply(
-      "Hozir yordamchi ishlamayapti. Tugmalardan foydalaning yoki biroz keyin qayta urinib ko'ring.",
-      { reply_markup: menu() }
+    await ctx.reply(aiErrorText(err), { reply_markup: menu() });
+  }
+}
+
+/**
+ * AI xatosini operator tushunadigan gapga aylantiradi.
+ *
+ * «Ishlamayapti» degan umumiy javob eng ko'p vaqt yeydigan holatni yashirib
+ * qo'yadi: kunlik limit tugagan. Buni bilsa operator kutadi yoki adminga
+ * aytadi — sababini qidirib o'tirmaydi.
+ */
+function aiErrorText(err: unknown): string {
+  const text = String((err as { message?: string })?.message ?? err);
+  if (/\b429\b|RESOURCE_EXHAUSTED|quota/i.test(text)) {
+    return (
+      "⏳ AI limiti tugadi — bugungi so'rovlar chegarasiga yetdik.\n" +
+      "Biroz kutib qayta urinib ko'ring yoki tugmali rejimdan foydalaning."
     );
   }
+  if (/\b503\b|overloaded|high demand/i.test(text)) {
+    return "⏳ AI hozir band. 10-15 soniyadan keyin qayta yozing.";
+  }
+  if (/\b404\b|not found|no longer available/i.test(text)) {
+    return "⚙️ Tanlangan AI modeli mavjud emas. Admin .env dagi AI_MODEL ni tekshirsin.";
+  }
+  return "Hozir yordamchi ishlamayapti. Tugmalardan foydalaning yoki biroz keyin qayta urinib ko'ring.";
 }
 
 /** Telegram qabul qiladigan reaksiyalar — boshqasi 400 xato beradi */
@@ -599,7 +620,7 @@ export async function handleGroupMention(ctx: MyContext): Promise<void> {
     await rememberAssistantMessage(ctx.chat!.id, msg.message_thread_id, sent.message_id, result.text);
   } catch (err) {
     console.error("Guruhda assistent javob bera olmadi:", err);
-    await ctx.reply("Hozir javob bera olmadim, biroz keyin urinib ko'ring.", {
+    await ctx.reply(aiErrorText(err), {
       message_thread_id: msg.message_thread_id,
       reply_parameters: { message_id: msg.message_id },
     });
