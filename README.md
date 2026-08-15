@@ -91,8 +91,12 @@ Bu ham tasdiqsiz ketmaydi — kimga va nima yuborilishini ko'rasiz. Yuborilgach 
 Guruh chatida bot faqat chaqirilganda aralashadi — uch yo'l bilan:
 
 - **`girgitton`** deb yozilsa (nomi bilan chaqirish)
-- botning xabariga **reply** qilinsa (suhbat davomi)
 - **@username** bilan tag qilinsa
+- botning **suhbat javobiga** reply qilinsa
+
+Uchinchisi ataylab tor: **karta, muddat eslatmasi va «BAJARILDI» bildirishnomasi suhbat hisoblanmaydi.** Ularga odamlar hamkasbini tag qilish uchun reply qiladi («@Iqboljon shuni ko'rib qo'y»), bot esa o'zicha «nima kerakligini aniqroq yozing» deb aralashib ketardi. Endi bunday joyda bot umuman uyg'onmaydi.
+
+Uyg'ongan taqdirda ham har gapga matn bilan javob bermaydi: «rahmat», «ok bo'ldi», xayrlashuv yoki gap boshqa odamga qaratilgan bo'lsa — **matn o'rniga reaksiya** qo'yadi (👍). Guruh ortiqcha xabar bilan to'lmaydi.
 
 ```
 👤 girgitton nechta bajarilmagan so'rov bor?

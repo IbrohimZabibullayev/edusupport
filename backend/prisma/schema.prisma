@@ -144,6 +144,12 @@ model GroupMessage {
   text         String?
   mediaKind    String?
   mediaFileId  String?
+  /**
+   * Botning o'z suhbat javobi. Shu xabarga reply kelsa — bu suhbat davomi.
+   * Karta, eslatma va bildirishnomalarga qilingan reply esa botga emas,
+   * hamkasbga qaratilgan bo'ladi — o'shanda bot aralashmasligi kerak.
+   */
+  isAssistant  Boolean  @default(false)
   createdAt    DateTime @default(now())
 
   @@unique([chatId, messageId])

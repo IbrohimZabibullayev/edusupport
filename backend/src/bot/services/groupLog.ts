@@ -67,6 +67,47 @@ export async function recordGroupMessage(ctx: MyContext): Promise<void> {
   void prune();
 }
 
+/**
+ * Botning o'z suhbat javobini belgilab qo'yadi.
+ *
+ * Faqat shu xabarlarga qilingan reply «suhbat davomi» hisoblanadi. Karta,
+ * muddat eslatmasi va «BAJARILDI» bildirishnomasi bu ro'yxatga kirmaydi —
+ * ularga reply qilib odamlar hamkasbini tag qiladi, bot esa o'zicha javob
+ * yozib suhbatga aralashib ketardi.
+ */
+export async function rememberAssistantMessage(
+  chatId: string | number,
+  threadId: number | undefined,
+  messageId: number,
+  text?: string
+): Promise<void> {
+  try {
+    await prisma.groupMessage.upsert({
+      where: { chatId_messageId: { chatId: String(chatId), messageId } },
+      create: {
+        chatId: String(chatId),
+        threadId: threadId ?? null,
+        messageId,
+        fromName: "bot",
+        isAssistant: true,
+        text: text?.slice(0, 500) ?? null,
+      },
+      update: { isAssistant: true },
+    });
+  } catch (err) {
+    console.error("Bot javobi belgilanmadi:", err);
+  }
+}
+
+/** Shu xabar botning suhbat javobimi (ya'ni unga reply qilsa bo'ladimi) */
+export async function isAssistantMessage(chatId: string | number, messageId: number): Promise<boolean> {
+  const row = await prisma.groupMessage.findUnique({
+    where: { chatId_messageId: { chatId: String(chatId), messageId } },
+    select: { isAssistant: true },
+  });
+  return row?.isAssistant === true;
+}
+
 /** Xabar kimdandir forward qilingan bo'lsa — kimdan ekanini o'qiydi */
 function forwardLabel(msg: Message): string | null {
   const origin = msg.forward_origin;
@@ -121,6 +162,8 @@ export async function recentGroupMessages(
       chatId: String(chatId),
       threadId: threadId ?? null,
       messageId: { lt: beforeMessageId },
+      // Botning o'z javoblari kontekstga kirmaydi — suhbat tarixi alohida beriladi
+      isAssistant: false,
     },
     orderBy: { messageId: "desc" },
     take: limit,

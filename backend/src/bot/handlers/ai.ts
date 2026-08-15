@@ -7,7 +7,12 @@ import { prisma } from "../../db";
 import { escapeHtml, formatTashkentDate, ticketId } from "../../util";
 import { menu } from "../keyboards";
 import { clientKeyOf, findClientSource } from "../services/clients";
-import { formatGroupContext, recentGroupMessages } from "../services/groupLog";
+import {
+  formatGroupContext,
+  isAssistantMessage,
+  recentGroupMessages,
+  rememberAssistantMessage,
+} from "../services/groupLog";
 import { deliveryLine } from "../services/notify";
 import { sendCard } from "../services/sendCard";
 import { persistSession } from "../session";
@@ -203,6 +208,14 @@ async function askAi(
     }
 
     ctx.session.aiPending = undefined;
+
+    // Shaxsiy chatda ham: javob shart bo'lmasa reaksiya yetarli
+    const emoji = result.reaction ?? reactionFromText(result.text);
+    if (emoji) {
+      await react(ctx, ctx.message?.message_id, emoji);
+      return;
+    }
+
     await ctx.reply(escapeHtml(result.text), { parse_mode: "HTML", reply_markup: menu() });
   } catch (err) {
     console.error("Assistent javob bera olmadi:", err);
@@ -210,6 +223,48 @@ async function askAi(
       "Hozir yordamchi ishlamayapti. Tugmalardan foydalaning yoki biroz keyin qayta urinib ko'ring.",
       { reply_markup: menu() }
     );
+  }
+}
+
+/** Telegram qabul qiladigan reaksiyalar — boshqasi 400 xato beradi */
+const ALLOWED_REACTIONS = new Set(["👍", "👌", "🙏", "🤝", "🫡", "💯", "🔥", "🤔", "👀", "❤", "🎉", "👏"]);
+
+/** Faqat e'tirof bildiradigan, ma'lumot bermaydigan javoblar */
+const BARE_ACK = /^(ok|okay|xo'p|xop|mayli|bo'ldi|boldi|tushunarli|rahmat|zo'r|zor|albatta)[\s!.]*$/i;
+
+/**
+ * Javob aslida reaksiya bo'lishi kerakmi.
+ *
+ * Model ba'zan `react` amalini chaqirmasdan shunchaki «👍» deb yozib yuboradi —
+ * bu ham guruhga xabar bo'lib tushadi, ya'ni maqsad buziladi. Shuning uchun
+ * mazmunsiz javoblarni o'zimiz reaksiyaga aylantiramiz.
+ *
+ * Ma'lumot beradigan qisqa javoblar («8 ta») tegilmaydi — ularda harf/raqam bor.
+ */
+export function reactionFromText(text: string): string | undefined {
+  const t = text.trim();
+  if (t.length === 0) return undefined;
+  if (BARE_ACK.test(t)) return "👍";
+  // Harf ham, raqam ham yo'q, lekin emoji bor — ya'ni sof reaksiya
+  if (/[\p{L}\p{N}]/u.test(t)) return undefined;
+  if (!/\p{Extended_Pictographic}/u.test(t)) return undefined;
+  const first = [...t].find((ch) => /\p{Extended_Pictographic}/u.test(ch));
+  return first && ALLOWED_REACTIONS.has(first) ? first : "👍";
+}
+
+/**
+ * Xabarga reaksiya qo'yadi.
+ *
+ * Reaksiya — eng arzon javob: suhbatni to'ldirmaydi, lekin operator botning
+ * ko'rganini biladi. Reaksiya qo'yilmasa ham (eski Telegram klienti, huquq
+ * yo'q) ish to'xtamasligi kerak, shuning uchun xato yutiladi.
+ */
+async function react(ctx: MyContext, messageId: number | undefined, emoji: string): Promise<void> {
+  if (!ctx.chat || !messageId) return;
+  try {
+    await ctx.api.setMessageReaction(ctx.chat.id, messageId, [{ type: "emoji", emoji: emoji as never }]);
+  } catch (err) {
+    console.error("Reaksiya qo'yilmadi:", err);
   }
 }
 
@@ -224,7 +279,12 @@ async function askAi(
  * Fayl biriktirilgan bo'lsa matn bilan birga o'sha fayllar ham qayta yuboriladi —
  * operator guruhga aynan nima ketishini (rasm bilan qo'shib) ko'rib turishi kerak.
  */
-async function showConfirm(ctx: MyContext, aiText: string, ps: Pending[], threadId?: number): Promise<void> {
+async function showConfirm(
+  ctx: MyContext,
+  aiText: string,
+  ps: Pending[],
+  threadId?: number
+): Promise<number | undefined> {
   const text = previewAll(aiText, ps);
   const keyboard = confirmKeyboard(ps);
 
@@ -232,11 +292,19 @@ async function showConfirm(ctx: MyContext, aiText: string, ps: Pending[], thread
   const media = only?.kind === "request" ? only.attachments : [];
 
   if (media.length > 0) {
-    await sendCard(ctx.api, ctx.chat!.id, text, media.map((a) => ({ kind: a.kind, fileId: a.fileId })), threadId, keyboard);
-    return;
+    const card = await sendCard(
+      ctx.api,
+      ctx.chat!.id,
+      text,
+      media.map((a) => ({ kind: a.kind, fileId: a.fileId })),
+      threadId,
+      keyboard
+    );
+    return card.messageId;
   }
 
-  await ctx.reply(text, { parse_mode: "HTML", message_thread_id: threadId, reply_markup: keyboard });
+  const sent = await ctx.reply(text, { parse_mode: "HTML", message_thread_id: threadId, reply_markup: keyboard });
+  return sent.message_id;
 }
 
 function confirmKeyboard(ps: Pending[]): InlineKeyboard {
@@ -431,7 +499,7 @@ function replyTarget(ctx: MyContext): { message_thread_id?: number; reply_markup
  */
 const WAKE_WORD = /(^|\s|[",.!?])girgitton\b/i;
 
-export function isGroupMention(ctx: MyContext): boolean {
+export async function isGroupMention(ctx: MyContext): Promise<boolean> {
   const msg = ctx.message;
   if (!msg || !ctx.chat || ctx.chat.type === "private") return false;
 
@@ -441,8 +509,13 @@ export function isGroupMention(ctx: MyContext): boolean {
   const me = ctx.me?.username;
   if (me && new RegExp(`@${me}\\b`, "i").test(text)) return true;
 
-  // Botning o'z xabariga reply — suhbat davomi
-  return msg.reply_to_message?.from?.id === ctx.me?.id;
+  // Botning xabariga reply — lekin har qanday xabariga emas.
+  // Karta, muddat eslatmasi va "BAJARILDI" bildirishnomasi suhbat emas:
+  // ularga reply qilib odamlar hamkasbini tag qiladi ("@Iqboljon qara"),
+  // bot esa o'zicha "nima kerakligini aniqroq yozing" deb aralashib ketardi.
+  const replied = msg.reply_to_message;
+  if (!replied || replied.from?.id !== ctx.me?.id) return false;
+  return isAssistantMessage(ctx.chat.id, replied.message_id);
 }
 
 /**
@@ -508,15 +581,25 @@ export async function handleGroupMention(ctx: MyContext): Promise<void> {
     // Guruhda so'rov tayyorlansa ham tasdiq shaxsiy chatdagidek tugma bilan
     if (result.pendings.length > 0) {
       ctx.session.aiPending = result.pendings;
-      await showConfirm(ctx, result.text, result.pendings, msg.message_thread_id);
+      const sent = await showConfirm(ctx, result.text, result.pendings, msg.message_thread_id);
+      if (sent) await rememberAssistantMessage(ctx.chat!.id, msg.message_thread_id, sent, result.text);
       return;
     }
 
-    await ctx.reply(escapeHtml(result.text), {
+    // Javob shart bo'lmasa — matn emas, reaksiya. Guruhni gapga to'ldirmaymiz.
+    const emoji = result.reaction ?? reactionFromText(result.text);
+    if (emoji) {
+      await react(ctx, msg.message_id, emoji);
+      return;
+    }
+
+    const sent = await ctx.reply(escapeHtml(result.text), {
       parse_mode: "HTML",
       message_thread_id: msg.message_thread_id,
       reply_parameters: { message_id: msg.message_id },
     });
+    // Shu javobga reply kelsa — suhbat davomi deb qabul qilamiz
+    await rememberAssistantMessage(ctx.chat!.id, msg.message_thread_id, sent.message_id, result.text);
   } catch (err) {
     console.error("Guruhda assistent javob bera olmadi:", err);
     await ctx.reply("Hozir javob bera olmadim, biroz keyin urinib ko'ring.", {

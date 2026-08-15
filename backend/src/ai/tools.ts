@@ -91,6 +91,8 @@ export interface ToolContext {
   /** Guruhda chaqirilgan bo'lsa — qaysi guruh/bo'limda. `from_message_ids` shu yerdan qidiriladi */
   groupChatId?: string;
   groupThreadId?: number;
+  /** Model «javob shart emas» desa — shu emoji xabarga reaksiya qilib qo'yiladi */
+  reaction?: string;
   /** Assistent yaratgan so'rovlar — javobda ko'rsatish uchun */
   created: string[];
   /**
@@ -161,6 +163,25 @@ export const AI_TOOLS = [
         },
       },
       required: ["school", "description"],
+    },
+  },
+  {
+    name: "react",
+    description:
+      "Xabarga faqat reaksiya qo'yadi — matn yozmaydi. Javob yozish SHART BO'LMAGANDA shuni chaqir: " +
+      "«rahmat», «ok», «bo'ldi», «tushunarli» kabi suhbat yakuni; xayrlashuv; " +
+      "gap senga emas, boshqa odamga qaratilgan bo'lsa (hamkasbini tag qilgan); " +
+      "yoki shunchaki e'tirof kutilayotgan bo'lsa. Bu holatda BOSHQA HECH NARSA yozma.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        emoji: {
+          type: "string",
+          enum: ["👍", "👌", "🙏", "🤝", "🫡", "💯", "🔥", "🤔", "👀"],
+          description: "Qaysi reaksiya. Odatiy holat — 👍",
+        },
+      },
+      required: ["emoji"],
     },
   },
   {
@@ -393,6 +414,8 @@ export async function runTool(name: string, input: any, ctx: ToolContext): Promi
       return createRequest(input, ctx);
     case "update_requests":
       return prepareUpdate(input, ctx);
+    case "react":
+      return setReaction(input, ctx);
     case "create_support_log":
       return createSupportLog(input, ctx);
     case "create_task":
@@ -543,6 +566,22 @@ function readDeadline(raw: unknown): Date | null {
   const text = String(raw ?? "").trim();
   if (text.length === 0) return null;
   return parseDeadlineTashkent(text);
+}
+
+/**
+ * Telegram faqat belgilangan emojilarni reaksiya sifatida qabul qiladi —
+ * ro'yxatdan tashqarisi 400 xato beradi. Model boshqasini tanlasa 👍 ga tushamiz.
+ */
+const ALLOWED_REACTIONS = new Set(["👍", "👌", "🙏", "🤝", "🫡", "💯", "🔥", "🤔", "👀"]);
+
+/** Javob yozmasdan xabarga reaksiya qo'yish */
+function setReaction(input: any, ctx: ToolContext): ToolResult {
+  const emoji = String(input.emoji ?? "").trim();
+  ctx.reaction = ALLOWED_REACTIONS.has(emoji) ? emoji : "👍";
+  return {
+    reacted: ctx.reaction,
+    note: "Reaksiya qo'yildi. Endi HECH QANDAY matn yozma — javobing bo'sh bo'lsin.",
+  };
 }
 
 /** Bir marta shuncha so'rovni o'zgartirish mumkin — kartalarni yangilash vaqt oladi */

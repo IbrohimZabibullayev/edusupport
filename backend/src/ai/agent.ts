@@ -52,6 +52,19 @@ async function buildSystemPrompt(op: Operator): Promise<string> {
     "- **Bir marta so'ralgan narsani qayta so'rama.** Operator javob bergan bo'lsa, o'sha javobni ishlat.",
     "- Tasdiq oynasi hamma tafsilotni o'zi ko'rsatadi — sen uni matnda takrorlama.",
     "",
+    "## Jim turishni bil — har gapga javob yozish SHART EMAS",
+    "Guruh — odamlarning suhbati, sen unda mehmonsan. Quyidagi hollarda `react` chaqir va matn yozma:",
+    "- «rahmat», «ok», «bo'ldi», «tushunarli», «zo'r» — suhbat yakuni;",
+    "- xayrlashuv yoki shunchaki e'tirof;",
+    "- gap SENGA emas, boshqa odamga qaratilgan (hamkasbini tag qilgan, o'zaro kelishayotgan);",
+    "- aytilgan narsa senga hech qanday ish bermaydi.",
+    "**Tushunmagan bo'lsang «nima kerakligini aniqroq yozing» deb so'rama** — bu ko'pincha gap senga",
+    "qaratilmaganini bildiradi. Shunday paytda `react` chaqir va jim tur.",
+    "Savol ochiq-oydin senga berilgan bo'lsagina javob yoz.",
+    "",
+    "⚠️ Emojini MATN qilib yozma («👍» deb javob yuborma) — bu ham xabar bo'lib guruhga tushadi.",
+    "Reaksiya qo'yish uchun `react` amalini chaqir, keyin javob matnini BO'SH qoldir.",
+    "",
     "## So'rov va support log farqi — bu eng muhim tanlov",
     "**So'rov** (create_request) — muammo HALI HAL QILINMAGAN va dasturchilar ko'rishi kerak.",
     "  Belgilar: «ishlamayapti», «chiqmayapti», «xato beryapti», «qo'shsak bo'ladimi», «muammo bor».",
@@ -123,6 +136,8 @@ export interface AgentResult {
   created: string[];
   /** Tasdiq kutayotgan amallar — bot tugma bilan so'raydi */
   pendings: Pending[];
+  /** Model «javob yozish shart emas» degan bo'lsa — shu emoji bilan reaksiya */
+  reaction?: string;
 }
 
 /**
@@ -206,9 +221,12 @@ export async function runAgent(opts: {
   }
 
   return {
-    text: text || "Bajarildi.",
+    // Reaksiya qo'yilgan bo'lsa matn umuman kerak emas. Model ba'zan reaksiya
+    // ustiga «*(javob yo'q)*» kabi qoldiq matn yozadi — u guruhga tushmasin.
+    text: toolCtx.reaction ? "" : text || "Bajarildi.",
     history: messages,
     created: toolCtx.created,
     pendings: toolCtx.pendings,
+    reaction: toolCtx.reaction,
   };
 }

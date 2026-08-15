@@ -421,7 +421,7 @@ function createBot(): Bot<MyContext> {
 
   // Guruhda "girgitton" deyilsa yoki bot xabariga reply qilinsa — assistent javob beradi.
   // Sessiya faqat shu holatda yuklanadi, aks holda har bir guruh xabariga yozuv bo'lardi.
-  const groupAi = bot.filter((ctx) => aiAvailable() && isGroupMention(ctx));
+  const groupAi = bot.filter(async (ctx) => aiAvailable() && (await isGroupMention(ctx)));
   groupAi.use(sessionMiddleware);
   groupAi.on("message", handleGroupMention);
 
