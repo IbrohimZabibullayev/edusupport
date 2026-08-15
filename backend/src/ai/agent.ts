@@ -1,4 +1,3 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { Operator } from "@prisma/client";
 import { Api } from "grammy";
 import { prisma } from "../db";
@@ -7,11 +6,11 @@ import { getActiveModules } from "../bot/services/modules";
 import { getActiveRequestTypes } from "../bot/services/requestTypes";
 import { getActiveSystems } from "../bot/services/systems";
 import { DraftAttachment } from "../bot/types";
-import { AI_EFFORT, AI_MAX_TOKENS, AI_MODEL, aiClient } from "./client";
+import { aiProvider } from "./client";
 import { AI_TOOLS, Pending, ToolContext, runTool } from "./tools";
+import { AiToolResult, AiTurn } from "./types";
 
-/** Suhbat tarixi sessiyada shu ko'rinishda saqlanadi */
-export type AiTurn = Anthropic.MessageParam;
+export type { AiTurn };
 
 /** Bir zanjirda nechta tool chaqiruvi bo'lishi mumkin — cheksiz aylanmasin */
 const MAX_STEPS = 6;
@@ -154,9 +153,9 @@ export async function runAgent(opts: {
   groupChatId?: string;
   groupThreadId?: number;
 }): Promise<AgentResult> {
-  const client = aiClient();
+  const provider = aiProvider();
   const system = await buildSystemPrompt(opts.operator);
-  const messages: AiTurn[] = [...opts.history, { role: "user", content: opts.userText }];
+  const turns: AiTurn[] = [...opts.history, { role: "user", text: opts.userText }];
 
   const toolCtx: ToolContext = {
     api: opts.api,
@@ -170,19 +169,9 @@ export async function runAgent(opts: {
 
   let text = "";
   for (let step = 0; step < MAX_STEPS; step++) {
-    const response = await client.messages.create({
-      model: AI_MODEL,
-      max_tokens: AI_MAX_TOKENS,
-      output_config: { effort: AI_EFFORT },
-      // Keshlash chegarasi system blokida: undan oldin tool sxemalari turadi,
-      // ya'ni ikkalasi birga keshlanadi. Bu prefiks har chaqiruvda bir xil —
-      // shuning uchun xarajatning katta qismi 0.1x narxda o'qishga aylanadi.
-      system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
-      tools: AI_TOOLS,
-      messages,
-    });
+    const response = await provider.step(system, turns, AI_TOOLS);
 
-    if (response.stop_reason === "refusal") {
+    if (response.refused) {
       return {
         text: "Bu so'rovni bajara olmadim. Boshqacha ifodalab ko'ring.",
         history: opts.history,
@@ -191,19 +180,13 @@ export async function runAgent(opts: {
       };
     }
 
-    messages.push({ role: "assistant", content: response.content });
-    text = response.content
-      .filter((b): b is Anthropic.TextBlock => b.type === "text")
-      .map((b) => b.text)
-      .join("\n")
-      .trim();
+    text = response.text;
+    turns.push({ role: "model", text: response.text, calls: response.calls });
+    if (response.calls.length === 0) break;
 
-    const toolUses = response.content.filter((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
-    if (toolUses.length === 0) break;
-
-    // Barcha natijalar bitta user xabarida qaytariladi
-    const results: Anthropic.ToolResultBlockParam[] = [];
-    for (const call of toolUses) {
+    // Barcha natijalar bitta navbatda qaytariladi
+    const results: AiToolResult[] = [];
+    for (const call of response.calls) {
       let payload: unknown;
       try {
         payload = await runTool(call.name, call.input, toolCtx);
@@ -211,20 +194,16 @@ export async function runAgent(opts: {
         console.error(`AI amali xato berdi (${call.name}):`, err);
         payload = { error: "Amalni bajarishda texnik xato yuz berdi." };
       }
-      results.push({
-        type: "tool_result",
-        tool_use_id: call.id,
-        content: JSON.stringify(payload),
-      });
+      results.push({ id: call.id, name: call.name, output: payload });
     }
-    messages.push({ role: "user", content: results });
+    turns.push({ role: "tool", results });
   }
 
   return {
     // Reaksiya qo'yilgan bo'lsa matn umuman kerak emas. Model ba'zan reaksiya
     // ustiga «*(javob yo'q)*» kabi qoldiq matn yozadi — u guruhga tushmasin.
     text: toolCtx.reaction ? "" : text || "Bajarildi.",
-    history: messages,
+    history: turns,
     created: toolCtx.created,
     pendings: toolCtx.pendings,
     reaction: toolCtx.reaction,

@@ -1,4 +1,5 @@
 import { config } from "./config";
+import { aiLabel } from "./ai/client";
 import { createServer } from "./api/server";
 import { bot } from "./bot/bot";
 import { startDeadlineReminderJob } from "./jobs/deadlineReminder";
@@ -34,7 +35,12 @@ async function main(): Promise<void> {
 
   bot
     .start({
-      onStart: (info) => console.log(`✅ Bot @${info.username} polling rejimida ishga tushdi`),
+      onStart: (info) => {
+        console.log(`✅ Bot @${info.username} polling rejimida ishga tushdi`);
+        // Qaysi AI ishlayotgani ko'rinib tursin — kalit almashtirilganda
+        // logdan darrov tasdiqlash mumkin
+        console.log(`🤖 Assistent: ${aiLabel()}`);
+      },
     })
     .catch((err) => {
       console.error("Bot ishga tushmadi:", err);

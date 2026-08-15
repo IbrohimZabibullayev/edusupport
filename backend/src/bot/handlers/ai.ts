@@ -3,6 +3,7 @@ import { Message } from "grammy/types";
 import { AiTurn, runAgent } from "../../ai/agent";
 import { aiEnabled } from "../../ai/client";
 import { Pending, PendingUpdate, submitPending, submitPendingMessage, submitPendingUpdate } from "../../ai/tools";
+import { isNeutralTurn } from "../../ai/types";
 import { prisma } from "../../db";
 import { escapeHtml, formatTashkentDate, ticketId } from "../../util";
 import { menu } from "../keyboards";
@@ -49,29 +50,25 @@ export function aiAvailable(): boolean {
 function freshHistory(ctx: MyContext): AiTurn[] {
   const ai = ctx.session.ai;
   if (!ai || Date.now() - ai.lastAt > HISTORY_TTL_MS) return [];
-  return ai.history as AiTurn[];
+  // Provayder almashtirilgan bo'lsa sessiyada eski formatdagi tarix qolishi
+  // mumkin — uni modelga yuborsak so'rov 400 bilan yiqiladi. Tanimasak
+  // tashlab yuboramiz: suhbat yangidan boshlanadi, bu xatodan yaxshiroq.
+  const turns = (ai.history as unknown[]).filter(isNeutralTurn);
+  return turns.length === ai.history.length ? turns : [];
 }
 
 /**
- * Tarixni qisqartiradi, lekin tool juftliklarini buzmasdan.
+ * Tarixni qisqartiradi, lekin amal juftliklarini buzmasdan.
  *
- * Oddiy slice xavfli: kesish tool_use bilan tool_result orasiga tushsa,
- * API "yetim" tool_result ni rad etadi. Shuning uchun kesilgandan keyin
- * boshidagi tool natijalarini ham tashlab, toza foydalanuvchi xabaridan
- * boshlaymiz.
+ * Oddiy slice xavfli: kesish amal chaqiruvi bilan uning natijasi orasiga
+ * tushsa, ikkala provayder ham "yetim" natijani rad etadi. Shuning uchun
+ * kesilgandan keyin boshidagi qoldiqlarni tashlab, toza foydalanuvchi
+ * xabaridan boshlaymiz.
  */
 function trimHistory(history: AiTurn[]): AiTurn[] {
   let out = history.slice(-MAX_HISTORY);
-  while (out.length > 0) {
-    const first = out[0];
-    const hasToolResult =
-      first.role === "user" &&
-      Array.isArray(first.content) &&
-      first.content.some((b) => typeof b === "object" && b !== null && (b as { type?: string }).type === "tool_result");
-    // Assistant bilan boshlanishi ham mumkin emas — javob avval savolni talab qiladi
-    if (hasToolResult || first.role === "assistant") out = out.slice(1);
-    else break;
-  }
+  // Suhbat faqat foydalanuvchi xabaridan boshlanishi mumkin
+  while (out.length > 0 && out[0].role !== "user") out = out.slice(1);
   return out;
 }
 

@@ -20,6 +20,7 @@ import { createSchool, schoolCandidates } from "../bot/services/schools";
 import { getActiveSystems } from "../bot/services/systems";
 import { getDevGroupId } from "../settings";
 import { DraftAttachment } from "../bot/types";
+import { ToolSchema } from "./types";
 
 /**
  * Assistent chaqira oladigan amallar.
@@ -105,7 +106,7 @@ export interface ToolContext {
 
 type ToolResult = Record<string, unknown>;
 
-export const AI_TOOLS = [
+export const AI_TOOLS: ToolSchema[] = [
   {
     name: "create_request",
     description:

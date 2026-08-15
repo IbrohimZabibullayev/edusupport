@@ -9,7 +9,7 @@ Operatorlar bot orqali so'rov (bug / muammo-savol / taklif) kiritadi, buglar dev
 
 ## 🤖 Assistent rejimi (asosiy usul)
 
-`ANTHROPIC_API_KEY` berilgan bo'lsa bot **tugmasiz** ishlaydi: operator oddiy xabar yozadi, bot o'zi tushunib kerakli ishni bajaradi.
+AI kaliti berilgan bo'lsa (`GOOGLE_API_KEY` yoki `ANTHROPIC_API_KEY`) bot **tugmasiz** ishlaydi: operator oddiy xabar yozadi, bot o'zi tushunib kerakli ishni bajaradi.
 
 ```
 👤 eduschoolda Farobiy Schoolda moliyada o'qituvchi maoshini
@@ -178,23 +178,38 @@ So'rov kartasi ham aynan shu manzilga tushadi. Tartib: takliflar uchun alohida c
 
 Sozlangani yetarli emas — bot guruhda turgani ham tekshiriladi. Bot chiqarilgan yoki guruh superguruhga aylanib ID o'zgargan bo'lsa shu yerda ko'rinadi. Oxirgi qator bot guruh xabarlarini ko'ra olayotganini aytadi; admin bo'lmasa «yuqoridagi xabarlarni so'rov qil» ishlamaydi va shu yerda ogohlantiriladi.
 
-### Model va xarajat
+### Qaysi AI — kalitga qarab o'zi tanlanadi
 
-**Claude Sonnet 5**, `effort: low`. Uchta variant bir xil 10 ta qiyin holatda o'lchandi:
+Bot ikki provayder bilan ishlaydi. `.env` ga qaysi kalit qo'yilsa, o'sha ishlaydi:
 
-| Variant | To'g'ri | Tezlik | 300 xabar/kun oyiga |
-|---|---|---|---|
-| **Sonnet 5 · low** ← tanlangan | **10/10** | ~7s | **~$76** |
-| Sonnet 5 · medium | 10/10 | ~8s | ~$90 |
-| Haiku 4.5 | 9/10 | ~3s | ~$57 |
+```bash
+# Google AI Studio — https://aistudio.google.com/apikey
+GOOGLE_API_KEY=AIza...
 
-Haiku arzonroq va tezroq, lekin eng oddiy holatda (maktab + modul ajratish) so'rov yaratmadi. Bundan tashqari uning prompt-kesh minimumi 4096 token — bizda prefiks ~2900, ya'ni kesh umuman ishlamaydi va narx afzalligi kutilganidan kam.
+# yoki Anthropic — https://console.anthropic.com
+ANTHROPIC_API_KEY=sk-ant-...
 
-**Prompt keshlash yoqilgan** — tizim prompti va tool sxemalari (~2900 token) har chaqiruvda 0.1x narxda o'qiladi. Bu xarajatni ~3 baravar kamaytiradi.
+# Modelni almashtirish (ixtiyoriy)
+AI_MODEL=
+```
 
-Modelni almashtirish uchun `backend/src/ai/client.ts` dagi ikki qatorni o'zgartirasiz.
+Ikkalasi berilsa **Google ustun** turadi. Hech biri berilmasa assistent o'chadi va bot eski tugmali rejimda ishlayveradi — boshqa hech narsa buzilmaydi. Bot ishga tushganda qaysi AI ulanganini logga yozadi:
 
-> Kalit berilmagan bo'lsa assistent o'chadi va bot eski tugmali rejimda ishlayveradi — boshqa hech narsa buzilmaydi.
+```
+🤖 Assistent: google · gemini-2.5-flash
+```
+
+Sukutdagi modellar: Google — `gemini-2.5-flash`, Anthropic — `claude-sonnet-5`. Kalitingizga qaysi modellar ochiqligini ko'rish uchun:
+
+```bash
+cd backend && npm run models
+```
+
+Ro'yxatdan birini tanlab `AI_MODEL` ga yozasiz — kodga tegish shart emas.
+
+**Provayder almashtirilganda ochiq suhbatlar buzilmaydi.** Ikkalasining xabar formati butunlay boshqacha, shuning uchun suhbat tarixi sessiyada neytral ko'rinishda saqlanadi (`src/ai/types.ts`) va har chaqiruvda kerakli formatga o'giriladi. Tanilmagan formatdagi eski tarix uchraса tashlab yuboriladi — suhbat yangidan boshlanadi, bu xatolikdan yaxshiroq.
+
+Anthropic yo'lida **prompt keshlash yoqilgan** — tizim prompti va amal sxemalari (~2900 token) har chaqiruvda 0.1x narxda o'qiladi, bu xarajatni ~3 baravar kamaytiradi. Sonnet 5 `effort: low` tanlangani o'lchov bilan asoslangan: 10 ta qiyin holatda Sonnet 5 low — 10/10 (~$76/oy), Haiku 4.5 — 9/10 (~$57/oy), eng oddiy holatda so'rov yaratmagan.
 
 ### Tugmali rejim (zaxira)
 
@@ -375,8 +390,12 @@ DEV_GROUP_ID=-1001234567890
 BACKLOG_CHAT_ID=
 PORT=3000
 
-# Assistent rejimi uchun (ixtiyoriy — berilmasa bot tugmali rejimda ishlaydi)
-ANTHROPIC_API_KEY=sk-ant-...
+# Assistent rejimi uchun (ixtiyoriy — berilmasa bot tugmali rejimda ishlaydi).
+# Bittasi yetarli; ikkalasi berilsa Google ustun turadi.
+GOOGLE_API_KEY=AIza...
+ANTHROPIC_API_KEY=
+# Modelni almashtirish (ixtiyoriy). Ro'yxat uchun: npm run models
+AI_MODEL=
 ```
 
 ### Frontend

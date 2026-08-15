@@ -1,30 +1,36 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { config } from "../config";
+import { anthropicProvider } from "./providers/anthropic";
+import { googleProvider } from "./providers/google";
+import { AiProvider } from "./types";
 
 /**
- * Assistent uchun model tanlovi.
+ * Qaysi AI ishlatilishi .env dagi kalitga qarab o'zi aniqlanadi:
  *
- * Sonnet 5 + effort "low" — 10 ta qiyin holatda o'lchandi:
- *   sonnet-5 low : 10/10, ~7s, oyiga ~$76 (300 xabar/kun)
- *   sonnet-5 med : 10/10, ~8s, oyiga ~$90
- *   haiku-4.5    :  9/10, ~3s, oyiga ~$57 — eng oddiy holatda so'rov yaratmadi
+ *   GOOGLE_API_KEY=...      → Google AI Studio (Gemini)
+ *   ANTHROPIC_API_KEY=...   → Anthropic (Claude)
  *
- * Haiku arzonroq va tezroq, lekin asosiy vazifada ishonchsiz. Bundan tashqari
- * uning kesh minimumi 4096 token (bizda prefiks ~2600) — ya'ni prompt keshi
- * umuman ishlamaydi va narx afzalligi yo'qoladi.
+ * Ikkalasi ham berilsa Google ustun turadi. Hech biri berilmasa assistent
+ * o'chadi va bot eski tugmali rejimda ishlayveradi.
+ *
+ * Modelni AI_MODEL bilan almashtirsa bo'ladi. Sukut bo'yicha:
+ *   Google    — gemini-2.5-flash (tez va arzon, kundalik ish uchun yetarli)
+ *   Anthropic — claude-sonnet-5
+ *
+ * Modelni tanlashdan oldin kalitingiz qaysi modellarga ruxsat berishini
+ * ko'rish uchun: npm run models
  */
-export const AI_MODEL = "claude-sonnet-5";
-export const AI_EFFORT = "low" as const;
-/** Fikrlash ham shu limitga kiradi — javoblar qisqa, lekin joy qoldiramiz */
-export const AI_MAX_TOKENS = 8000;
-
-let client: Anthropic | null = null;
-
 export function aiEnabled(): boolean {
-  return config.anthropicApiKey.length > 0;
+  return config.googleApiKey.length > 0 || config.anthropicApiKey.length > 0;
 }
 
-export function aiClient(): Anthropic {
-  if (!client) client = new Anthropic({ apiKey: config.anthropicApiKey });
-  return client;
+export function aiProvider(): AiProvider {
+  if (config.googleApiKey) return googleProvider;
+  return anthropicProvider;
+}
+
+/** Loglar va diagnostika uchun: "google · gemini-2.5-flash" */
+export function aiLabel(): string {
+  if (!aiEnabled()) return "o'chirilgan";
+  const p = aiProvider();
+  return `${p.name} · ${p.model}`;
 }
